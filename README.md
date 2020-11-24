@@ -8,3 +8,7 @@ achieve the authentication of data query requests and the integrity of data tran
 
 
 Run the simulaton.java file to see the simulation.
+
+JPBC libraries are needed to run the files. 
+They can be downloaded from here: http://gas.dia.unisa.it/projects/jpbc/download.html 
+Add the jars files to the CLASSPATH varialbe.
