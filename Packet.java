@@ -18,6 +18,6 @@ public interface Packet extends Serializable{
     String getPairingParameters();
     byte[] getPrivateKey();
     BigInteger getId();
-    boolean isVa();
+    boolean isFirst();
     
 }

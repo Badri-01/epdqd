@@ -32,8 +32,11 @@ import static java.lang.Thread.sleep;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.time.LocalTime;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -51,6 +54,7 @@ public class CCM implements Runnable, Serializable {
     protected DatagramSocket socket = null;
     private InetAddress group;
     private byte[] buf;
+    private static int noOfVehicles;
 
     static class DataPacket implements Packet {
 
@@ -87,13 +91,14 @@ public class CCM implements Runnable, Serializable {
         }
 
         @Override
-        public boolean isVa() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        public boolean isFirst() {
+            return noOfVehicles==1;
         }
     }
 
     public CCM() {
         System.out.println("CCM has started running");
+        noOfVehicles=0;
     }
 
     public Pairing runningGen(int k) {
@@ -112,7 +117,7 @@ public class CCM implements Runnable, Serializable {
     }
 
     public Element H(BigInteger plainText) {
-        Element h = G.newElement();;
+        Element h = G.newElement();
         try {
             MessageDigest mdSha1 = MessageDigest.getInstance("SHA-1");
             byte[] pSha = mdSha1.digest(plainText.toByteArray());
@@ -172,7 +177,7 @@ public class CCM implements Runnable, Serializable {
         socket.close();
     }
 
-    public Packet receive(int port) throws Exception {
+    public Packet receive(int port) throws SocketException, IOException, ClassNotFoundException  {
         socket = new DatagramSocket(port);
         byte[] incomingData = new byte[1024];
         DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
@@ -183,6 +188,7 @@ public class CCM implements Runnable, Serializable {
         ByteArrayInputStream in = new ByteArrayInputStream(data);
         ObjectInputStream is = new ObjectInputStream(in);
         Packet dp = (Packet) is.readObject();
+        noOfVehicles++;
         return dp;
     }
 
@@ -239,11 +245,17 @@ public class CCM implements Runnable, Serializable {
                         }while(!sent);
                         System.out.println("Packet Sent ");      
                 }
-
                 //System.out.println("Private key generated :"+resdp.getPrivateKey());
-            } catch (Exception e) {
+            } catch (SocketException e) {
+                socket.close();
+                System.out.println("I am not getting any requests");
+            } catch (InterruptedException ex) {
+                System.out.println(ex);
+            } catch (Exception e){
                 System.out.println(e);
             }
+            
+            
         }
 
     }

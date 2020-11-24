@@ -19,7 +19,7 @@ public class Simulation {
         Runnable Va = new Vehicle(1);
         Thread V1 = new Thread(Va);
         V1.start();
-   
+        
     }
 
 }

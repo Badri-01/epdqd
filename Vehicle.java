@@ -34,6 +34,7 @@ public class Vehicle implements Runnable, Serializable {
     private Element Sv;
     private Pairing pairing;
     public int pub_id;
+    private boolean isVa;
 
     public Vehicle(int id) {
         pub_id = id;
@@ -74,7 +75,7 @@ public class Vehicle implements Runnable, Serializable {
         }
 
         @Override
-        public boolean isVa() {
+        public boolean isFirst() {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
@@ -117,6 +118,7 @@ public class Vehicle implements Runnable, Serializable {
 
     public void run() {
         boolean flag = true;
+        //Getting Parameters from ccm
         while (flag) {
             try {
                 //Register in CCM by sending id.
@@ -134,11 +136,21 @@ public class Vehicle implements Runnable, Serializable {
                 Sv = pairing.getG1().newElement();
                 Sv.setFromBytes(elementbytes);
                 System.out.println("Got my private key" + Sv);
+                isVa=resdp.isFirst();
+                flag=false;
             } catch (Exception e) {
                 System.out.println(e);
             }
         }
-
+        
+        //for Va
+        if(isVa){
+            System.out.println("I'm Va");
+        }
+        else{
+            System.out.println("I'm one of Vi");
+        }
+        System.out.println("Vehicle "+pub_id+" done");
     }
 
     public Pairing generatePairing(String params) {
