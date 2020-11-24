@@ -17,7 +17,7 @@ public interface Packet extends Serializable{
     String typeOfPacket();
     String getPairingParameters();
     byte[] getPrivateKey();
-    BigInteger getId();
+    BigInteger getId();hiiiiii
     boolean isVa();
     
 }
