@@ -14,8 +14,8 @@ public class Simulation {
     public static void main(String args[]) {
         Thread ccm = new Thread(new CCM(9000));
         ccm.start();
-        //Thread rsu = new Thread(new RSU(9000,9001));
-        //rsu.start();
+        Thread rsu = new Thread(new RSU(9000));
+        rsu.start();
         Runnable Va = new Vehicle(1,9000);
         Thread V1 = new Thread(Va);
         Runnable Vb = new Vehicle(2,9000);
@@ -24,9 +24,7 @@ public class Simulation {
         Thread V3 = new Thread(Vc);
         V1.start();
         V2.start();
-        V3.start();
-        
-        
+        V3.start();        
     }
 
 }
