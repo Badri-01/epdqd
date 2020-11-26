@@ -21,6 +21,7 @@ import java.io.PrintWriter;
 import java.io.Serializable;
 import static java.lang.Thread.sleep;
 import java.math.BigInteger;
+import java.net.BindException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -35,13 +36,16 @@ public class Vehicle implements Runnable, Serializable {
     private Pairing pairing;
     public int pub_id;
     private boolean isVa;
+    public int port1,port2; //port1 for sending port2 for receiving
 
-    public Vehicle(int id) {
+    public Vehicle(int id,int port1,int port2) {
         pub_id = id;
         Random rnd = new Random();
         V_id = new BigInteger(10, rnd);
+        this.port1=port1;
+        this.port2=port2;
         System.out.println("Vehicle " + pub_id + " is Running");
-        System.out.println("My_id :" + V_id);
+        //System.out.println("My_id :" + V_id);
     }
 
     static class DataPacket implements Packet {
@@ -122,35 +126,36 @@ public class Vehicle implements Runnable, Serializable {
         while (flag) {
             try {
                 //Register in CCM by sending id.
-                DataPacket dp = new DataPacket("RequestPrivateKey", V_id);
+                DataPacket dp = new DataPacket("RequestPrivateKey" + pub_id, V_id);
                 boolean sent = false;
                 do {
-                    sent = send(dp, 9000);
+                    sent = send(dp, port1);
                 } while (!sent);
-                System.out.println("Packet Sent ");
+                System.out.println("Vehicle " + pub_id + "Packet Sent ");
                 //Getting Private key
-                Packet resdp = receive(9001);
-                System.out.println("Packet received = " + resdp.typeOfPacket());
+                Packet resdp = receive(port2);
+                System.out.println("Vehicle " + pub_id + "Packet received = " + resdp.typeOfPacket());
                 pairing = generatePairing(resdp.getPairingParameters());
                 byte[] elementbytes = resdp.getPrivateKey();
                 Sv = pairing.getG1().newElement();
                 Sv.setFromBytes(elementbytes);
-                System.out.println("Got my private key" + Sv);
-                isVa=resdp.isFirst();
-                flag=false;
+                System.out.println("Vehicle " + pub_id + "Got private key" + Sv);
+                isVa = resdp.isFirst();
+                flag = false;
+            } catch (BindException e) {
+                //Someother vehicle busy receiving packet.
             } catch (Exception e) {
                 System.out.println(e);
             }
         }
-        
+
         //for Va
-        if(isVa){
-            System.out.println("I'm Va");
+        if (isVa) {
+            System.out.println("Vehicle " + pub_id + "is Va");
+        } else {
+            System.out.println("Vehicle " + pub_id + "is one of Vi");
         }
-        else{
-            System.out.println("I'm one of Vi");
-        }
-        System.out.println("Vehicle "+pub_id+" done");
+        System.out.println("Vehicle " + pub_id + " done");
     }
 
     public Pairing generatePairing(String params) {

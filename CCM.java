@@ -35,8 +35,6 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.time.LocalTime;
 import java.util.Date;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -234,8 +232,8 @@ public class CCM implements Runnable, Serializable {
                 String type = dp.typeOfPacket();
                 System.out.println("Packet received = " + type);
                 //Respond with private key
-                switch (type) {
-                    case "RequestPrivateKey":
+                //switch (type) {
+                    //case "RequestPrivateKey":
                         BigInteger id = dp.getId();
                         Element priv_key = H(id).mulZn(s);
                         DataPacket resdp = new DataPacket("ResponsePrivateKey", id, priv_key.toBytes(), params.toString());
@@ -244,7 +242,7 @@ public class CCM implements Runnable, Serializable {
                             sent=send(resdp,9001);
                         }while(!sent);
                         System.out.println("Packet Sent ");      
-                }
+                //}
                 //System.out.println("Private key generated :"+resdp.getPrivateKey());
             } catch (SocketException e) {
                 socket.close();
