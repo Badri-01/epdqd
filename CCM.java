@@ -19,25 +19,24 @@ import it.unisa.dia.gas.jpbc.Element;
 
 import java.io.File;
 import java.io.PrintWriter;//For file writing;
-import java.math.BigInteger;
-import java.util.Random;
-import java.security.MessageDigest;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import static java.lang.Thread.sleep;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.SocketException;
-import java.time.LocalTime;
-import java.util.Date;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.util.Random;
+import java.util.Date;
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import static java.lang.Thread.sleep;
+import java.time.LocalTime;
+
 
 public class CCM implements Runnable, Serializable {
 
@@ -49,10 +48,11 @@ public class CCM implements Runnable, Serializable {
     Element s;                //CCM master Key
     Element Ppub;            //CCM public key
     BigInteger q;           //Large Prime Set by CCM
-    protected DatagramSocket socket = null;
+    protected ServerSocket serverSock = null;
+    protected Socket socket = null;
     private InetAddress group;
     private byte[] buf;
-    private static int noOfVehicles;
+    int port;
 
     static class DataPacket implements Packet {
 
@@ -60,12 +60,14 @@ public class CCM implements Runnable, Serializable {
         byte element[];
         String pairParams;
         BigInteger V_id;
+        int priority;
 
-        public DataPacket(String type, BigInteger V_id, byte[] element, String pairParams) {
+        public DataPacket(String type, BigInteger V_id, byte[] element, String pairParams, int priority) {
             this.type = type;
             this.V_id = V_id;
             this.element = element;
             this.pairParams = pairParams;
+            this.priority=priority;
         }
 
         @Override
@@ -90,13 +92,51 @@ public class CCM implements Runnable, Serializable {
 
         @Override
         public boolean isFirst() {
-            return noOfVehicles==1;
+            return priority == 0;
         }
     }
 
-    public CCM() {
+    class ClientHandler extends Thread {
+
+        final ObjectInputStream in;
+        final ObjectOutputStream out;
+        final Socket soc;
+        int priority;
+
+        public ClientHandler(Socket soc, ObjectInputStream in, ObjectOutputStream out, int priority) {
+            this.soc = soc;
+            this.in = in;
+            this.out = out;
+            this.priority = priority;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Packet dp = (Packet) in.readObject();
+                String type = dp.typeOfPacket();
+                System.out.println("CCM received packet= " + type);
+                BigInteger id = dp.getId();
+                Element priv_key = H(id).mulZn(s);
+                DataPacket resdp = new DataPacket("ResponsePrivateKey", id, priv_key.toBytes(), params.toString(), priority);
+                out.writeObject(resdp);
+                //System.out.println("Packet Sent ");
+            } catch (IOException | ClassNotFoundException e) {
+                System.out.println(e);
+            }
+            try {
+                soc.close();
+                this.in.close();
+                this.out.close();
+            } catch (IOException e) {
+                System.out.println(e);
+            }
+        }
+    }
+
+    public CCM(int port) {
+        this.port=port;
         System.out.println("CCM has started running");
-        noOfVehicles=0;
     }
 
     public Pairing runningGen(int k) {
@@ -166,51 +206,14 @@ public class CCM implements Runnable, Serializable {
         return new BigInteger(digest);
     }
 
-    public void multicast(String multicastMessage) throws IOException {
+    /*public void multicast(String multicastMessage) throws IOException {
         socket = new DatagramSocket();
         group = InetAddress.getByName("230.0.0.0");
         buf = multicastMessage.getBytes();
         DatagramPacket packet = new DatagramPacket(buf, buf.length, group, 4446);
         socket.send(packet);
         socket.close();
-    }
-
-    public Packet receive(int port) throws SocketException, IOException, ClassNotFoundException  {
-        socket = new DatagramSocket(port);
-        byte[] incomingData = new byte[1024];
-        DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
-        socket.setSoTimeout(15000);
-        socket.receive(incomingPacket);
-        byte[] data = incomingPacket.getData();
-        socket.close();
-        ByteArrayInputStream in = new ByteArrayInputStream(data);
-        ObjectInputStream is = new ObjectInputStream(in);
-        Packet dp = (Packet) is.readObject();
-        noOfVehicles++;
-        return dp;
-    }
-
-    public boolean send(Packet packet, int port) {
-        try {
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            ObjectOutputStream os = new ObjectOutputStream(outputStream);
-            os.flush();
-            os.writeObject(packet);
-            sleep(500);
-            os.flush();
-            byte[] resdata = outputStream.toByteArray();
-            InetAddress IPAddress = InetAddress.getByName("localhost");
-            socket = new DatagramSocket();
-            DatagramPacket sendPacket = new DatagramPacket(resdata, resdata.length, IPAddress, port);
-            socket.send(sendPacket);
-            socket.close();
-        } catch (Exception e) {
-            System.out.println(e);
-            return false;
-        }
-        return true;
-    }
-
+    }*/
     public void run() {
         int k = 160;
         pairing = runningGen(k);
@@ -224,38 +227,32 @@ public class CCM implements Runnable, Serializable {
         Random rnd = new Random();
         q = BigInteger.probablePrime(1024, rnd);
         boolean flag = true;
-        while (flag) {
-            try {
-                //Got Vehicle Id
-                Packet dp = receive(9000);
-                sleep(1000);
-                String type = dp.typeOfPacket();
-                System.out.println("Packet received = " + type);
-                //Respond with private key
-                //switch (type) {
-                    //case "RequestPrivateKey":
-                        BigInteger id = dp.getId();
-                        Element priv_key = H(id).mulZn(s);
-                        DataPacket resdp = new DataPacket("ResponsePrivateKey", id, priv_key.toBytes(), params.toString());
-                        boolean sent=false;
-                        do{
-                            sent=send(resdp,9001);
-                        }while(!sent);
-                        System.out.println("Packet Sent ");      
-                //}
-                //System.out.println("Private key generated :"+resdp.getPrivateKey());
-            } catch (SocketException e) {
-                socket.close();
-                System.out.println("I am not getting any requests");
-            } catch (InterruptedException ex) {
-                System.out.println(ex);
-            } catch (Exception e){
-                System.out.println(e);
-            }
-            
-            
+        try {
+            serverSock = new ServerSocket(port);
+            serverSock.setSoTimeout(10000);
+            System.out.println("ServerReady");
+        } catch (Exception e) {
+            System.out.println(e);
         }
+        int priority = 0;
+        while (flag) {
+            socket = null;
+            try {
+                sleep(100);
+                socket = serverSock.accept();
+                //System.out.println("A new Vehicle is connected : " + socket);
+                ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                //System.out.println("Assigning new thread for this client");
+                Thread t = new ClientHandler(socket, in, out, priority++);
+                t.start();
+            } catch (SocketTimeoutException e) {
+                System.out.println("CCM not getting any requests");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
+        }
     }
 
 }
@@ -268,8 +265,6 @@ public class CCM implements Runnable, Serializable {
                 byte[] buf = new byte[256];
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 socket.receive(packet);
-                
-                
                 if (in == null) {
                     dString = new Date().toString();
                 } else {
