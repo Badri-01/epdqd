@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package epdqd;
 
 /**
@@ -85,69 +80,98 @@ public class Vehicle implements Runnable, Serializable {
 
     }
 
-    public Packet receive(int port) throws Exception {
-        socket = new DatagramSocket(port);
-        byte[] incomingData = new byte[1024];
-        DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
-        socket.setSoTimeout(15000);
-        socket.receive(incomingPacket);
-        byte[] data = incomingPacket.getData();
-        socket.close();
-        ByteArrayInputStream in = new ByteArrayInputStream(data);
-        ObjectInputStream is = new ObjectInputStream(in);
-        Packet dp = (Packet) is.readObject();
-        return dp;
-    }
-
-    public boolean send(Packet packet, int port) {
-        try {
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            ObjectOutputStream os = new ObjectOutputStream(outputStream);
-            os.flush();
-            sleep(2000);
-            os.writeObject(packet);
-            os.flush();
-            byte[] data = outputStream.toByteArray();
-            InetAddress IPAddress = InetAddress.getByName("localhost");
-            socket = new DatagramSocket();
-            DatagramPacket sendPacket = new DatagramPacket(data, data.length, IPAddress, port);
-            socket.send(sendPacket);
-            socket.close();
-        } catch (Exception e) {
-            System.out.println(e);
-            return false;
-        }
-        return true;
-    }
+    // public Packet receive(int port) throws Exception {
+    //     socket = new DatagramSocket(port);
+    //     byte[] incomingData = new byte[1024];
+    //     DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
+    //     socket.setSoTimeout(15000);
+    //     socket.receive(incomingPacket);
+    //     byte[] data = incomingPacket.getData();
+    //     socket.close();
+    //     ByteArrayInputStream in = new ByteArrayInputStream(data);
+    //     ObjectInputStream is = new ObjectInputStream(in);
+    //     Packet dp = (Packet) is.readObject();
+    //     return dp;
+    // }
+    //
+    // public boolean send(Packet packet, int port) {
+    //     try {
+    //         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    //         ObjectOutputStream os = new ObjectOutputStream(outputStream);
+    //         os.flush();
+    //         sleep(2000);
+    //         os.writeObject(packet);
+    //         os.flush();
+    //         byte[] data = outputStream.toByteArray();
+    //         InetAddress IPAddress = InetAddress.getByName("localhost");
+    //         socket = new DatagramSocket();
+    //         DatagramPacket sendPacket = new DatagramPacket(data, data.length, IPAddress, port);
+    //         socket.send(sendPacket);
+    //         socket.close();
+    //     } catch (Exception e) {
+    //         System.out.println(e);
+    //         return false;
+    //     }
+    //     return true;
+    // }
 
     public void run() {
-        boolean flag = true;
-        //Getting Parameters from ccm
-        while (flag) {
-            try {
-                //Register in CCM by sending id.
-                DataPacket dp = new DataPacket("RequestPrivateKey" + pub_id, V_id);
-                boolean sent = false;
-                do {
-                    sent = send(dp, port1);
-                } while (!sent);
-                System.out.println("Vehicle " + pub_id + "Packet Sent ");
-                //Getting Private key
-                Packet resdp = receive(port2);
-                System.out.println("Vehicle " + pub_id + "Packet received = " + resdp.typeOfPacket());
-                pairing = generatePairing(resdp.getPairingParameters());
-                byte[] elementbytes = resdp.getPrivateKey();
-                Sv = pairing.getG1().newElement();
-                Sv.setFromBytes(elementbytes);
-                System.out.println("Vehicle " + pub_id + "Got private key" + Sv);
-                isVa = resdp.isFirst();
-                flag = false;
-            } catch (BindException e) {
-                //Someother vehicle busy receiving packet.
-            } catch (Exception e) {
-                System.out.println(e);
-            }
-        }
+                  DataPacket dp = new DataPacket("RequestPrivateKey" + pub_id, V_id);
+                  InetAddress ip = InetAddress.getByName("localhost");
+                 Socket s = new Socket(ip,9000);
+                  boolean flag = true;
+                 while (flag)
+                 {
+                   try{
+                   ObjectOutputStream oos=new ObjectOutputStream(s.getOutputStream());
+                   oos.writeObject(packet);
+                   System.out.println("Vehicle " + pub_id + "Packet Sent ");
+                   ObjectInputStream ois=new ObjectInputStream(s.getInputStream());
+                   Packet resdp=(Packet)ois.readObject();
+                   System.out.println("Vehicle " + pub_id + "Packet received = " + resdp.typeOfPacket());
+                   pairing = generatePairing(resdp.getPairingParameters());
+                   byte[] elementbytes = resdp.getPrivateKey();
+                   Sv = pairing.getG1().newElement();
+                   Sv.setFromBytes(elementbytes);
+                   System.out.println("Vehicle " + pub_id + "Got private key" + Sv);
+                   isVa = resdp.isFirst();
+                   flag = false;
+                 }
+                 catch (Exception e) {
+                    System.out.println(e);
+                }
+               }
+               s.close();
+
+        // boolean flag = true;
+        // //Getting Parameters from ccm
+        // while (flag) {
+        //     try {
+        //         //Register in CCM by sending id.
+        //
+        //
+        //         DataPacket dp = new DataPacket("RequestPrivateKey" + pub_id, V_id);
+        //         boolean sent = false;
+        //         do {
+        //             sent = send(dp, port1);
+        //         } while (!sent);
+        //         System.out.println("Vehicle " + pub_id + "Packet Sent ");
+        //         //Getting Private key
+        //         Packet resdp = receive(port2);
+        //         System.out.println("Vehicle " + pub_id + "Packet received = " + resdp.typeOfPacket());
+        //         pairing = generatePairing(resdp.getPairingParameters());
+        //         byte[] elementbytes = resdp.getPrivateKey();
+        //         Sv = pairing.getG1().newElement();
+        //         Sv.setFromBytes(elementbytes);
+        //         System.out.println("Vehicle " + pub_id + "Got private key" + Sv);
+        //         isVa = resdp.isFirst();
+        //         flag = false;
+        //     } catch (BindException e) {
+        //         //Someother vehicle busy receiving packet.
+        //     } catch (Exception e) {
+        //         System.out.println(e);
+        //     }
+        // }
 
         //for Va
         if (isVa) {
@@ -184,7 +208,6 @@ public class Vehicle implements Runnable, Serializable {
 
 
 /*
-
     protected MulticastSocket socket = null;
     protected byte[] buf = new byte[256];
 socket = new MulticastSocket(4446);
