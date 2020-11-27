@@ -53,6 +53,7 @@ public class CCM implements Runnable, Serializable {
     private InetAddress group;
     private byte[] buf;
     int port;
+    static boolean isRSURegistered=false;
 
     static class DataPacket implements Packet {
 
@@ -92,7 +93,9 @@ public class CCM implements Runnable, Serializable {
 
         @Override
         public boolean isFirst() {
-            return priority == 0;
+            if(isRSURegistered)
+                return priority == 1 ;
+            return priority == 0 ;
         }
     }
 
@@ -115,7 +118,10 @@ public class CCM implements Runnable, Serializable {
             try {
                 Packet dp = (Packet) in.readObject();
                 String type = dp.typeOfPacket();
-                System.out.println("CCM received packet= " + type);
+                System.out.println("CCM received packet= " + type+" Priority: "+priority);
+                if(type.equals("RSURequestPrivateKey")){
+                    isRSURegistered=true;
+                }
                 BigInteger id = dp.getId();
                 Element priv_key = H(id).mulZn(s);
                 DataPacket resdp = new DataPacket("ResponsePrivateKey", id, priv_key.toBytes(), params.toString(), priority);
