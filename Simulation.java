@@ -22,7 +22,7 @@ public class Simulation {
         Thread V2 = new Thread(Vb);
         Runnable Vc = new Vehicle(3,9000);
         Thread V3 = new Thread(Vc);
-        V1.start();
+        V1.start();//Thread.sleep(100);
         V2.start();
         V3.start();        
     }
