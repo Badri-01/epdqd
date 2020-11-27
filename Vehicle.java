@@ -20,6 +20,7 @@ import java.io.PrintWriter;
 import java.io.Serializable;
 import static java.lang.Thread.sleep;
 import java.math.BigInteger;
+import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
 import java.net.Socket;
@@ -80,7 +81,6 @@ public class Vehicle implements Runnable, Serializable {
 
     }
 
-
     public void run() {
         boolean flag = true;
         //Getting Parameters from ccm
@@ -107,6 +107,8 @@ public class Vehicle implements Runnable, Serializable {
                 out.close();
                 in.close();
                 flag = false;
+            } catch (ConnectException e) {
+                //ServerNotReady
             } catch (IOException | ClassNotFoundException | InterruptedException e) {
                 e.printStackTrace();
             }

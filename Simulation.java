@@ -4,7 +4,6 @@
  * and open the template in the editor.
  */
 package epdqd;
-
 /**
  *
  * @author hp
@@ -24,7 +23,7 @@ public class Simulation {
         Thread V3 = new Thread(Vc);
         V1.start();
         V2.start();
-        V3.start();        
+        V3.start();
     }
 
 }

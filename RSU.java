@@ -21,6 +21,7 @@ import java.net.InetAddress;
 import java.net.MulticastSocket;
 import java.util.Random;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.Socket;
 // import java.util.Date;
 // import java.time.LocalTime;
@@ -108,6 +109,8 @@ public class RSU implements Runnable, Serializable {
                 out.close();
                 in.close();
                 flag = false;
+            }catch (ConnectException e) {
+                //ServerNotReady
             } catch (IOException | ClassNotFoundException | InterruptedException e) {
                 e.printStackTrace();
             }
