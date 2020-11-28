@@ -37,7 +37,6 @@ import java.security.MessageDigest;
 import static java.lang.Thread.sleep;
 import java.time.LocalTime;
 
-
 public class CCM implements Runnable, Serializable {
 
     PairingParameters params;
@@ -53,7 +52,6 @@ public class CCM implements Runnable, Serializable {
     private InetAddress group;
     private byte[] buf;
     int port;
-    static boolean isRSURegistered=false;
 
     static class DataPacket implements Packet {
 
@@ -68,7 +66,7 @@ public class CCM implements Runnable, Serializable {
             this.V_id = V_id;
             this.element = element;
             this.pairParams = pairParams;
-            this.priority=priority;
+            this.priority = priority;
         }
 
         @Override
@@ -93,9 +91,7 @@ public class CCM implements Runnable, Serializable {
 
         @Override
         public boolean isFirst() {
-            if(isRSURegistered)
-                return priority == 1 ;
-            return priority == 0 ;
+            return priority == 1;
         }
     }
 
@@ -118,10 +114,7 @@ public class CCM implements Runnable, Serializable {
             try {
                 Packet dp = (Packet) in.readObject();
                 String type = dp.typeOfPacket();
-                System.out.println("CCM received packet= " + type+" Priority: "+priority);
-                if(type.equals("RSURequestPrivateKey")){
-                    isRSURegistered=true;
-                }
+                System.out.println("CCM received packet= " + type + " Priority: " + priority);
                 BigInteger id = dp.getId();
                 Element priv_key = H(id).mulZn(s);
                 DataPacket resdp = new DataPacket("ResponsePrivateKey", id, priv_key.toBytes(), params.toString(), priority);
@@ -141,7 +134,7 @@ public class CCM implements Runnable, Serializable {
     }
 
     public CCM(int port) {
-        this.port=port;
+        this.port = port;
         System.out.println("CCM has started running");
     }
 
