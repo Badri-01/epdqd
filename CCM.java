@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -48,9 +47,7 @@ public class CCM implements Runnable, Serializable {
     Element Ppub;            //CCM public key
     BigInteger q;           //Large Prime Set by CCM
     protected ServerSocket serverSock = null;
-    protected Socket socket = null;
-    private InetAddress group;
-    private byte[] buf;
+    Socket socket=null;
     int port;
 
     static class DataPacket implements Packet {
@@ -205,14 +202,6 @@ public class CCM implements Runnable, Serializable {
         return new BigInteger(digest);
     }
 
-    /*public void multicast(String multicastMessage) throws IOException {
-        socket = new DatagramSocket();
-        group = InetAddress.getByName("230.0.0.0");
-        buf = multicastMessage.getBytes();
-        DatagramPacket packet = new DatagramPacket(buf, buf.length, group, 4446);
-        socket.send(packet);
-        socket.close();
-    }*/
     public void run() {
         int k = 160;
         pairing = runningGen(k);
@@ -228,7 +217,7 @@ public class CCM implements Runnable, Serializable {
         boolean flag = true;
         try {
             serverSock = new ServerSocket(port);
-            serverSock.setSoTimeout(10000);
+            serverSock.setSoTimeout(20000);
             System.out.println("ServerReady");
         } catch (Exception e) {
             System.out.println(e);
@@ -246,7 +235,7 @@ public class CCM implements Runnable, Serializable {
                 Thread t = new ClientHandler(socket, in, out, priority++);
                 t.start();
             } catch (SocketTimeoutException e) {
-                System.out.println("CCM not getting any requests");
+                System.out.println("CCM not getting any requests. Okay Never Mind :)");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -256,24 +245,3 @@ public class CCM implements Runnable, Serializable {
 
 }
 
-
-/*
-    while (flag) {
-            try {
-                String dString;
-                byte[] buf = new byte[256];
-                DatagramPacket packet = new DatagramPacket(buf, buf.length);
-                socket.receive(packet);
-                if (in == null) {
-                    dString = new Date().toString();
-                } else {
-                    dString = LocalTime.now().toString();
-                }
-                multicast(dString);
-                sleep(FIVE_SECONDS);
-                System.out.println("RSU is still running;");
-            }catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
- */

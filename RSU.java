@@ -115,6 +115,8 @@ public class RSU implements Runnable, Serializable {
                 e.printStackTrace();
             }
         }
+        
+        
         System.out.println("RSU done");
     }
 
