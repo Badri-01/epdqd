@@ -30,11 +30,9 @@ import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Random;
-import java.util.Date;
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import static java.lang.Thread.sleep;
-import java.time.LocalTime;
 
 public class CCM implements Runnable, Serializable {
 
@@ -116,7 +114,7 @@ public class CCM implements Runnable, Serializable {
                 Element priv_key = H(id).mulZn(s);
                 DataPacket resdp = new DataPacket("ResponsePrivateKey", id, priv_key.toBytes(), params.toString(), priority);
                 out.writeObject(resdp);
-                //System.out.println("Packet Sent ");
+                //System.out.println("Private Key Sent :" +priv_key);
             } catch (IOException | ClassNotFoundException e) {
                 System.out.println(e);
             }
@@ -193,14 +191,6 @@ public class CCM implements Runnable, Serializable {
 
     }
 
-    public BigInteger HMAC(BigInteger key, BigInteger input) throws Exception {
-
-        Mac hmacSHA512 = Mac.getInstance("HmacSHA512");
-        SecretKeySpec secretKeySpec = new SecretKeySpec(key.toByteArray(), "HmacSHA512");
-        hmacSHA512.init(secretKeySpec);
-        byte[] digest = hmacSHA512.doFinal(input.toByteArray());
-        return new BigInteger(digest);
-    }
 
     public void run() {
         int k = 160;
