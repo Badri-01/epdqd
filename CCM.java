@@ -33,6 +33,8 @@ import java.util.Random;
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import static java.lang.Thread.sleep;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class CCM implements Runnable, Serializable {
 
@@ -45,7 +47,7 @@ public class CCM implements Runnable, Serializable {
     Element Ppub;            //CCM public key
     BigInteger q;           //Large Prime Set by CCM
     protected ServerSocket serverSock = null;
-    Socket socket=null;
+    Socket socket = null;
     int port;
 
     static class DataPacket implements Packet {
@@ -55,13 +57,15 @@ public class CCM implements Runnable, Serializable {
         String pairParams;
         BigInteger V_id;
         int priority;
+        BigInteger q;
 
-        public DataPacket(String type, BigInteger V_id, byte[] element, String pairParams, int priority) {
+        public DataPacket(String type, BigInteger V_id, byte[] element, String pairParams, int priority, BigInteger q) {
             this.type = type;
             this.V_id = V_id;
             this.element = element;
             this.pairParams = pairParams;
             this.priority = priority;
+            this.q = q;
         }
 
         @Override
@@ -88,6 +92,11 @@ public class CCM implements Runnable, Serializable {
         public boolean isFirst() {
             return priority == 1;
         }
+
+        @Override
+        public BigInteger getq() {
+            return q;
+        }
     }
 
     class ClientHandler extends Thread {
@@ -112,7 +121,7 @@ public class CCM implements Runnable, Serializable {
                 System.out.println("CCM received packet= " + type + " Priority: " + priority);
                 BigInteger id = dp.getId();
                 Element priv_key = H(id).mulZn(s);
-                DataPacket resdp = new DataPacket("ResponsePrivateKey", id, priv_key.toBytes(), params.toString(), priority);
+                DataPacket resdp = new DataPacket("ResponsePrivateKey", id, priv_key.toBytes(), params.toString(), priority, q);
                 out.writeObject(resdp);
                 //System.out.println("Private Key Sent :" +priv_key);
             } catch (IOException | ClassNotFoundException e) {
@@ -162,15 +171,6 @@ public class CCM implements Runnable, Serializable {
         return h;
     }
 
-    public BigInteger H2(BigInteger plainText) throws Exception {
-        Element h = G.newElement();
-        MessageDigest mdSha1 = MessageDigest.getInstance("MD-5");
-        byte[] pSha = mdSha1.digest(plainText.toByteArray());
-        BigInteger no = new BigInteger(1, pSha);     //1 indicates positive number.
-        byte[] ba = no.toByteArray();
-        return new BigInteger(ba);
-    }
-
     public static BigInteger E(BigInteger key, BigInteger clearText) throws Exception {
 
         Cipher rc4 = Cipher.getInstance("RC4");
@@ -190,7 +190,6 @@ public class CCM implements Runnable, Serializable {
         return new BigInteger(clearText);
 
     }
-
 
     public void run() {
         int k = 160;
@@ -226,6 +225,11 @@ public class CCM implements Runnable, Serializable {
                 t.start();
             } catch (SocketTimeoutException e) {
                 System.out.println("CCM not getting any requests. Okay Never Mind :)");
+                flag = false;
+                try {
+                    serverSock.close();
+                } catch (IOException ex) {
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -234,4 +238,3 @@ public class CCM implements Runnable, Serializable {
     }
 
 }
-

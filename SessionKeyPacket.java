@@ -5,20 +5,14 @@
  */
 package epdqd;
 
+import java.io.Serializable;
+
 /**
  *
  * @author hp
  */
-
-import java.io.Serializable;
-import java.math.BigInteger;
-
-public interface Packet extends Serializable{
+public interface SessionKeyPacket extends Serializable{
     String typeOfPacket();
-    String getPairingParameters();
     byte[] getPrivateKey();
-    BigInteger getId();
-    boolean isFirst();
-    BigInteger getq();
-    
+    int getPort();
 }

@@ -31,6 +31,7 @@ import java.net.MulticastSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -46,6 +47,7 @@ public class Vehicle implements Runnable, Serializable {
     private Element Sv;
     private Pairing pairing;
     public int pub_id;
+    BigInteger q = null;
     private boolean isVa;
     public int port; //For receiving and sending.
 
@@ -94,10 +96,15 @@ public class Vehicle implements Runnable, Serializable {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
+        @Override
+        public BigInteger getq() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
     }
 
     //For data transfer between vehicle to vehicle.
-    static class DataPacket2 implements V2VPacket {
+    static class DataPacket2 implements SessionKeyPacket {
 
         String type;
         byte privateKey[];
@@ -158,7 +165,87 @@ public class Vehicle implements Runnable, Serializable {
 
     }
 
-    public void multicast(V2VPacket request) throws IOException, InterruptedException {
+
+    static class DataPacket5 implements QueryRequestPacketVi {
+
+        BigInteger Vi, Ci, TS, MACi;
+
+        public DataPacket5(BigInteger Vi, BigInteger Ci, BigInteger TS, BigInteger MACi) {
+            this.Vi = Vi;
+            this.Ci = Ci;
+            this.TS = TS;
+            this.MACi = MACi;
+        }
+
+        @Override
+        public BigInteger getTS() {
+            return TS;
+        }
+
+        @Override
+        public BigInteger getVi() {
+            return Vi;
+        }
+
+        @Override
+        public BigInteger getCi() {
+            return Ci;
+        }
+
+        @Override
+        public BigInteger getMACi() {
+            return MACi;
+        }
+
+    }
+    
+    static class DataPacket6 implements QueryRequestPacketVa {
+
+        BigInteger Va, Ca_1,Ca_2, TS,MACa;
+        List<BigInteger> primes;
+
+        public DataPacket6(BigInteger Va, BigInteger Ca_1, BigInteger Ca_2, List<BigInteger> primes, BigInteger TS, BigInteger MACa) {
+            this.Va = Va;
+            this.Ca_1 = Ca_1;
+            this.Ca_2 = Ca_2;
+            this.primes=primes;
+            this.TS = TS;
+            this.MACa = MACa;
+        }
+
+        @Override
+        public BigInteger getTS() {
+            return TS;
+        }
+
+        @Override
+        public BigInteger getVa() {
+            return Va;
+        }
+
+        @Override
+        public BigInteger getCa_1() {
+            return Ca_1;
+        }
+        
+        @Override
+        public BigInteger getCa_2() {
+            return Ca_2;
+        }
+
+        @Override
+        public BigInteger getMACa() {
+            return MACa;
+        }
+
+        @Override
+        public List<BigInteger> getPrimes() {
+            return primes;
+        }
+
+    }
+    
+    public void multicast(SessionKeyPacket request) throws IOException, InterruptedException {
         DatagramSocket socket = null;
         InetAddress group;
         socket = new DatagramSocket();
@@ -196,6 +283,14 @@ public class Vehicle implements Runnable, Serializable {
 
     }
 
+    public BigInteger H2(BigInteger plainText) throws Exception {
+        MessageDigest mdSha1 = MessageDigest.getInstance("MD-5");
+        byte[] pSha = mdSha1.digest(plainText.toByteArray());
+        BigInteger no = new BigInteger(1, pSha);     //1 indicates positive number.
+        byte[] ba = no.toByteArray();
+        return new BigInteger(ba);
+    }
+
     public BigInteger HMAC(String input) throws Exception {
         String key = "SECUREHMACKEY";
         Mac hmacSHA512 = Mac.getInstance("HmacSHA512");
@@ -209,7 +304,7 @@ public class Vehicle implements Runnable, Serializable {
         int i = 256;
         List<BigInteger> primelist = new ArrayList<>();
         while (true) {
-            if (primelist.size() >= k) {
+            if (primelist.size() > k) {
                 break;
             }
             if (BigInteger.valueOf(i).isProbablePrime(i / 2)) {
@@ -242,6 +337,7 @@ public class Vehicle implements Runnable, Serializable {
                 Sv.setFromBytes(elementbytes);
                 //System.out.println("Vehicle " + pub_id + " private key" + Sv);
                 isVa = resdp.isFirst();
+                q = resdp.getq();
                 //System.out.println("isVa"+isVa);
                 soc.close();
                 out.close();
@@ -255,8 +351,10 @@ public class Vehicle implements Runnable, Serializable {
         }
         //for Va
         if (isVa) {
-            //To handle communication of Va to each vehicle.
-            class VehicleHandler extends Thread {
+
+            ArrayList<Element> SessionKeys = new ArrayList<>(); //Used in step 3. Ca,1
+
+            class VehicleHandler extends Thread { // To handle communication of Va to each vehicle.
 
                 final ObjectInputStream in;
                 final ObjectOutputStream out;
@@ -281,7 +379,7 @@ public class Vehicle implements Runnable, Serializable {
                 @Override
                 public void run() {
                     try {
-                        V2VPacket resdp = (V2VPacket) in.readObject();
+                        SessionKeyPacket resdp = (SessionKeyPacket) in.readObject();
                         String type = resdp.typeOfPacket();
                         System.out.println("Va received packet= " + type);
                         byte[] elementbytes = resdp.getPrivateKey();
@@ -289,6 +387,7 @@ public class Vehicle implements Runnable, Serializable {
                         ViPriv_Key.setFromBytes(elementbytes);
                         KVa_Vi = pairing.pairing(Sv, ViPriv_Key);
                         System.out.println("Va established.Session Key with one of Vi");
+                        SessionKeys.add(KVa_Vi);
                         while (Alphai == null || Kd == null) {
                             // do nothing
                             sleep(100);
@@ -298,27 +397,23 @@ public class Vehicle implements Runnable, Serializable {
                         DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
                         String formattedDate = datetime.format(myFormatObj);
                         System.out.println("After formatting: " + formattedDate);
-                        BigInteger TS= new BigInteger(formattedDate);
-                        BigInteger key = new BigInteger(KVa_Vi.toBigInteger().toString() + TS.toString()); 
+                        BigInteger TS = new BigInteger(formattedDate);
+                        BigInteger key = new BigInteger(KVa_Vi.toBigInteger().toString() + TS.toString());
                         BigInteger cipherAlphai = E(key, Alphai);
                         BigInteger cipherKd = E(key, Kd);
                         String macinput = KVa_Vi.toBigInteger().toString() + cipherAlphai.toString() + cipherKd.toString() + TS.toString();
                         BigInteger MACai = HMAC(macinput);
                         DataPacket3 dp = new DataPacket3(cipherAlphai, cipherKd, TS, MACai);
-                        out.writeObject(dp);
                         System.out.println("Alphai sent: " + Alphai + "\nKd sent: " + Kd);
-
-                    } catch (Exception e) {
-                        System.out.println("NumberFormatException here:" + e);
-                    }
-                    //Communication is Over with Vi.
-                    try {
+                        out.writeObject(dp);
                         soc.close();
                         this.in.close();
                         this.out.close();
+
                     } catch (Exception e) {
                         System.out.println(e);
                     }
+                    //Communication is Over with Vi.
                 }
 
             }
@@ -330,7 +425,7 @@ public class Vehicle implements Runnable, Serializable {
             while (flag) {
                 try {
                     sleep(5000);
-                    V2VPacket request = new DataPacket2("Cooperation Request", Sv.toBytes(), port);
+                    SessionKeyPacket request = new DataPacket2("Cooperation Request", Sv.toBytes(), port);
                     multicast(request);
                     flag = false;
                 } catch (Exception e) {
@@ -371,6 +466,10 @@ public class Vehicle implements Runnable, Serializable {
                 } catch (SocketTimeoutException e) {
                     //System.out.println("Not getting any requests");
                     flag = false;
+                    try {
+                        serverSock.close();
+                    } catch (IOException ex) {
+                    }
                     break;
                 } catch (Exception e) {
                     flag = false;
@@ -378,7 +477,8 @@ public class Vehicle implements Runnable, Serializable {
                 }
             }
 
-            List<BigInteger> primelist = primeNumbers(threads.size());
+            List<BigInteger> primelist = primeNumbers(threads.size()); //returns k no of prime numbers k=(threads.size())+1;
+            //First k-1 prime numbers are for Vi's. And last prime is for Va.
             Random rnd = new Random();
             BigInteger Kd = new BigInteger(128, rnd);
             BigInteger Q = new BigInteger("1");
@@ -392,13 +492,89 @@ public class Vehicle implements Runnable, Serializable {
                 BigInteger Alphai = Qi.multiply(QiI);
                 threads.get(i).setValues(Alphai, Kd);
             }
-            //System.out.println(primelist);
+            int a = threads.size();
+            BigInteger qa = primelist.get(a);
+            BigInteger Qa = Q.divide(qa);
+            BigInteger QaI = Qa.modInverse(qa);
+            BigInteger Alpha_a = Qa.multiply(QaI);
+
+            // System.out.println(primelist);
+            // Query Group Formulation step completed.
+            // Query Request Generation step started.
+            Element KVa_RSU = null;
+            flag = true;
+            port = 9004;
+            while (flag) {
+                try {
+                    sleep(5000);
+                    // Session Key Establishment.
+                    InetAddress ip = InetAddress.getByName("localhost");
+                    socket = new Socket(ip, port);
+                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                    SessionKeyPacket dp = new DataPacket2("Va Session Key Establishment", Sv.toBytes(), 9004);
+                    out.writeObject(dp);
+                    out.flush();
+                    sleep(500);
+                    SessionKeyPacket resdp = (SessionKeyPacket) in.readObject();
+                    String type = resdp.typeOfPacket();
+                    System.out.println("Vi received packet= " + type);
+                    byte[] elementbytes = resdp.getPrivateKey();
+                    Element RSUPriv_Key = pairing.getG1().newElement();
+                    RSUPriv_Key.setFromBytes(elementbytes);
+                    KVa_RSU = pairing.pairing(Sv, RSUPriv_Key);
+                    System.out.println("Va established session Key with RSU");
+
+                    //Sending Query request
+                    BigInteger ma = new BigInteger(8, rnd);
+                    BigInteger part1_a1 = ma.multiply(Alpha_a);
+                    LocalDateTime datetime = LocalDateTime.now();
+                    DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
+                    String formattedDate = datetime.format(myFormatObj);
+                    //System.out.println("After formatting: " + formattedDate);
+                    BigInteger TS = new BigInteger(formattedDate);
+                    String forPart2_a1 = KVa_RSU.toBigInteger().toString() + "1" + TS.toString();
+                    BigInteger part2_a1 = new BigInteger(forPart2_a1);
+                    BigInteger part3_a1 = new BigInteger("0");
+                    for (int i = 0; i < SessionKeys.size(); i++) {
+                        String forPart3_a1 = SessionKeys.get(i).toBigInteger().toString() + "2" + TS.toString();
+                        part3_a1 = part3_a1.add((new BigInteger(forPart3_a1)).mod(q));
+                    }
+                    BigInteger Ca_1 = part1_a1;
+                    Ca_1 = Ca_1.add(part2_a1);
+                    Ca_1 = Ca_1.subtract(part3_a1);
+                    
+                    // part1_a2 is Kd 
+                    String forPart2_a2=KVa_RSU.toBigInteger().toString() + "3" + TS.toString();
+                    BigInteger part2_a2=(new BigInteger(forPart2_a2)).mod(q);
+                    BigInteger Ca_2=Kd;
+                    Ca_2 = Ca_2.add(part2_a2);
+                    
+                    
+                    String macinput = KVa_RSU.toBigInteger().toString() + Ca_1.toString() + Ca_2.toString()+ primelist + TS.toString();
+                    BigInteger MACi = HMAC(macinput);
+                    DataPacket6 query = new DataPacket6(V_id, Ca_1, Ca_2,primelist, TS, MACi);
+                    out.writeObject(query);
+                    sleep(500);
+                    System.out.println("Query Request Sent from Vi");
+                    //Query Request Sent
+
+                    flag = false;
+                    socket.close();
+                    out.close();
+                    in.close();
+                } catch (ConnectException e) {
+                    //Va hasn't started receiving packets.
+                } catch (Exception ex) {
+                    System.out.println("I am the exception Va " + ex);
+                }
+            }
 
         } //All other vehicles acting as Vi
         else {
 
             Element KVa_Vi = null;
-            BigInteger Alphai;
+            BigInteger Alphai = null;
             BigInteger Kd;
 
             System.out.println("Vehicle " + pub_id + " is one of Vi");
@@ -415,10 +591,10 @@ public class Vehicle implements Runnable, Serializable {
                 byte[] data = packet.getData();
                 ByteArrayInputStream in = new ByteArrayInputStream(data);
                 ObjectInputStream is = new ObjectInputStream(in);
-                V2VPacket dp = null;
-                dp = (V2VPacket) is.readObject();
+                SessionKeyPacket dp = null;
+                dp = (SessionKeyPacket) is.readObject();
                 port = dp.getPort();
-                System.out.println("Vehicle " + pub_id + " got :" + dp.typeOfPacket());
+                System.out.println("Vehicle " + pub_id + " received= " + dp.typeOfPacket());
                 byte[] elementbytes = dp.getPrivateKey();
                 Element VaPriv_Key = pairing.getG1().newElement();
                 VaPriv_Key.setFromBytes(elementbytes);
@@ -442,7 +618,7 @@ public class Vehicle implements Runnable, Serializable {
                     Socket soc = new Socket(ip, port);
                     ObjectOutputStream out = new ObjectOutputStream(soc.getOutputStream());
                     ObjectInputStream in = new ObjectInputStream(soc.getInputStream());
-                    V2VPacket dp = new DataPacket2("Accepted Cooperation Request", Sv.toBytes(), port);
+                    SessionKeyPacket dp = new DataPacket2("Accepted Cooperation Request", Sv.toBytes(), port);
                     out.writeObject(dp);
                     sleep(500);
                     QueryGroupPacket resdp = (QueryGroupPacket) in.readObject();
@@ -464,13 +640,76 @@ public class Vehicle implements Runnable, Serializable {
                     System.out.println("Alphai and Kd are received");
                     System.out.println("Alphai received: " + Alphai + "\nKd received: " + Kd);
                     flag = false;
+                    soc.close();
+                    out.close();
+                    in.close();
                 } catch (ConnectException e) {
                     //Va hasn't started receiving packets.
                 } catch (Exception ex) {
                     System.out.println("I am the exception " + ex);
                 }
             }
+            // Query Group Formulation step completed.
+            // Query Request Generation..
 
+            Element KVi_RSU = null;
+            flag = true;
+            port = 9004;
+            while (flag) {
+                try {
+                    // Session Key Establishment.
+                    InetAddress ip = InetAddress.getByName("localhost");
+                    Socket soc = new Socket(ip, port);
+                    ObjectOutputStream out = new ObjectOutputStream(soc.getOutputStream());
+                    ObjectInputStream in = new ObjectInputStream(soc.getInputStream());
+                    SessionKeyPacket dp = new DataPacket2("Vi Session Key Establishment", Sv.toBytes(), 9004);
+                    out.writeObject(dp);
+                    sleep(500);
+                    SessionKeyPacket resdp = (SessionKeyPacket) in.readObject();
+                    String type = resdp.typeOfPacket();
+                    System.out.println("Vi received packet= " + type);
+                    byte[] elementbytes = resdp.getPrivateKey();
+                    Element RSUPriv_Key = pairing.getG1().newElement();
+                    RSUPriv_Key.setFromBytes(elementbytes);
+                    KVi_RSU = pairing.pairing(Sv, RSUPriv_Key);
+                    System.out.println("Vi established session Key with RSU");
+
+                    //Sending Query request
+                    Random rnd = new Random();
+                    BigInteger mi = new BigInteger(8, rnd);
+                    BigInteger part1 = mi.multiply(Alphai);
+                    LocalDateTime datetime = LocalDateTime.now();
+                    DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
+                    String formattedDate = datetime.format(myFormatObj);
+                    //System.out.println("After formatting: " + formattedDate);
+                    BigInteger TS = new BigInteger(formattedDate);
+                    String forPart2 = KVi_RSU.toBigInteger().toString() + "1" + TS.toString();
+                    BigInteger part2 = new BigInteger(forPart2);
+                    String forPart3 = KVa_Vi.toBigInteger().toString() + "2" + TS.toString();
+                    BigInteger part3 = (new BigInteger(forPart3)).mod(q);
+                  
+                    BigInteger Ci = part1;
+                    Ci = Ci.add(part2);
+                    Ci = Ci.add(part3);
+                    String macinput = KVi_RSU.toBigInteger().toString() + Ci.toString() + TS.toString();
+                    BigInteger MACi = HMAC(macinput);
+                    DataPacket5 query = new DataPacket5(V_id, Ci, TS, MACi);
+                    out.writeObject(query);
+                    sleep(500);
+                    System.out.println("Query Request Sent from Vi");
+                    //Query Request Sent
+
+                    flag = false;
+                    soc.close();
+                    out.close();
+                    in.close();
+                } catch (ConnectException e) {
+                    //Va hasn't started receiving packets.
+                } catch (Exception ex) {
+                    System.out.println("I am the exception Vi" + ex);
+                    //flag=false;
+                }
+            }
         }
 
         System.out.println("Vehicle " + pub_id + " done");

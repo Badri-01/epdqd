@@ -6,15 +6,15 @@
 package epdqd;
 
 import java.io.Serializable;
+import java.math.BigInteger;
 
 /**
  *
  * @author hp
  */
-public interface V2VPacket extends Serializable{
-    String typeOfPacket();
-    byte[] getPrivateKey();
-    int getPort();
-    
-    
+public interface QueryRequestPacketVi extends Serializable{
+    BigInteger getVi();
+    BigInteger getCi();
+    BigInteger getTS();
+    BigInteger getMACi();
 }
