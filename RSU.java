@@ -44,8 +44,8 @@ public class RSU implements Runnable, Serializable {
         this.port = port;
         Random rnd = new Random();
         RSU_id = new BigInteger(10, rnd);
-        System.out.println("RSU " + " is Running");
-        System.out.println("My_id :" + RSU_id);
+        System.out.println("RSU has started Running");
+        //System.out.println("My_id :" + RSU_id);
     }
 
     static class DataPacket implements Packet {

@@ -196,12 +196,12 @@ public class Vehicle implements Runnable, Serializable {
 
     }
 
-    public BigInteger HMAC(BigInteger input) throws Exception {
+    public BigInteger HMAC(String input) throws Exception {
         String key = "SECUREHMACKEY";
         Mac hmacSHA512 = Mac.getInstance("HmacSHA512");
         SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "HmacSHA512");
         hmacSHA512.init(secretKeySpec);
-        byte[] digest = hmacSHA512.doFinal(input.toByteArray());
+        byte[] digest = hmacSHA512.doFinal(input.getBytes());
         return new BigInteger(digest);
     }
 
@@ -298,19 +298,19 @@ public class Vehicle implements Runnable, Serializable {
                         DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
                         String formattedDate = datetime.format(myFormatObj);
                         System.out.println("After formatting: " + formattedDate);
-                        BigInteger TS = new BigInteger(formattedDate);
-                        BigInteger key = new BigInteger(KVa_Vi.toBigInteger().toString() + TS.toString());
+                        BigInteger TS= new BigInteger(formattedDate);
+                        BigInteger key = new BigInteger(KVa_Vi.toBigInteger().toString() + TS.toString()); 
                         BigInteger cipherAlphai = E(key, Alphai);
                         BigInteger cipherKd = E(key, Kd);
                         String macinput = KVa_Vi.toBigInteger().toString() + cipherAlphai.toString() + cipherKd.toString() + TS.toString();
-                        BigInteger MACai = HMAC(new BigInteger(macinput));
+                        BigInteger MACai = HMAC(macinput);
                         DataPacket3 dp = new DataPacket3(cipherAlphai, cipherKd, TS, MACai);
                         out.writeObject(dp);
+                        System.out.println("Alphai sent: " + Alphai + "\nKd sent: " + Kd);
 
                     } catch (Exception e) {
-                        System.out.println(e);
+                        System.out.println("NumberFormatException here:" + e);
                     }
-
                     //Communication is Over with Vi.
                     try {
                         soc.close();
@@ -343,9 +343,9 @@ public class Vehicle implements Runnable, Serializable {
 
             try {
                 sleep(1000);
-                System.out.println(port);
+                //System.out.println(port);
                 serverSock = new ServerSocket(port);
-                serverSock.setSoTimeout(10000);
+                serverSock.setSoTimeout(5000);
                 //System.out.println("Va Started Accepting requests.");
             } catch (BindException e) {
                 System.out.println("Bind exception here " + e);
@@ -392,12 +392,12 @@ public class Vehicle implements Runnable, Serializable {
                 BigInteger Alphai = Qi.multiply(QiI);
                 threads.get(i).setValues(Alphai, Kd);
             }
-            System.out.println(primelist);
+            //System.out.println(primelist);
 
         } //All other vehicles acting as Vi
         else {
 
-            Element KVa_Vi=null;
+            Element KVa_Vi = null;
             BigInteger Alphai;
             BigInteger Kd;
 
@@ -446,23 +446,23 @@ public class Vehicle implements Runnable, Serializable {
                     out.writeObject(dp);
                     sleep(500);
                     QueryGroupPacket resdp = (QueryGroupPacket) in.readObject();
-                    BigInteger recievedMAC=resdp.getMACai();                           
+                    BigInteger recievedMAC = resdp.getMACai();
                     BigInteger TS = resdp.getTS();
                     BigInteger key = new BigInteger(KVa_Vi.toBigInteger().toString() + TS.toString());
-                    BigInteger cipherAlphai =resdp.getCipherAlphai();
+                    BigInteger cipherAlphai = resdp.getCipherAlphai();
                     BigInteger cipherKd = resdp.getCipherKd();
                     String macinput = KVa_Vi.toBigInteger().toString() + cipherAlphai.toString() + cipherKd.toString() + TS.toString();
-                    BigInteger MAC = HMAC(new BigInteger(macinput));
-                    if(MAC.equals(recievedMAC)){
+                    BigInteger MAC = HMAC(macinput);
+                    if (MAC.equals(recievedMAC)) {
                         System.out.println("Received Packet is Valid ");
-                    }
-                    else{
+                    } else {
                         System.out.println("Received Packet is Invalid ");
                         break;
                     }
                     Alphai = D(key, cipherAlphai);
                     Kd = D(key, cipherKd);
                     System.out.println("Alphai and Kd are received");
+                    System.out.println("Alphai received: " + Alphai + "\nKd received: " + Kd);
                     flag = false;
                 } catch (ConnectException e) {
                     //Va hasn't started receiving packets.
