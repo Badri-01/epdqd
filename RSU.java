@@ -130,6 +130,20 @@ public class RSU implements Runnable, Serializable {
         }
 
     }
+    
+    public Element H(BigInteger plainText) {
+        Element h = pairing.getG1().newElement();
+        try {
+            MessageDigest mdSha1 = MessageDigest.getInstance("SHA-1");
+            byte[] pSha = mdSha1.digest(plainText.toByteArray());
+            BigInteger no = new BigInteger(1, pSha);     //1 indicates positive number.
+            byte[] ba = no.toByteArray();
+            h = pairing.getG1().newElement().setFromHash(ba, 0, ba.length);
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        return h;
+    }
 
     public BigInteger H2(BigInteger plainText) throws Exception {
         MessageDigest mdSha1 = MessageDigest.getInstance("MD5");
@@ -170,7 +184,7 @@ public class RSU implements Runnable, Serializable {
                 byte[] elementbytes = dp.getPrivateKey();
                 Element VxPriv_Key = pairing.getG1().newElement();
                 VxPriv_Key.setFromBytes(elementbytes);
-                KVx_RSU = pairing.pairing(Srsu, VxPriv_Key);
+                KVx_RSU = pairing.pairing(H(RSU_id), VxPriv_Key);
                 SessionKeyPacket resdp = new DataPacket4("Session Key Establishment", Srsu.toBytes());
                 out.writeObject(resdp);
                 sleep(500);

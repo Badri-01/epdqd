@@ -50,10 +50,10 @@ public class Vehicle implements Runnable, Serializable {
     BigInteger q = null;
     private boolean isVa;
     public int port; //For receiving and sending.
-    BigInteger miaisum=new BigInteger("0");
-    static BigInteger sigmaCi=new BigInteger("0");
-    static BigInteger Ca1=null;
-    static BigInteger Mpart3=new BigInteger("0");
+    BigInteger miaisum = new BigInteger("0");
+    static BigInteger sigmaCi = new BigInteger("0");
+    static BigInteger Ca1 = null;
+    static BigInteger Mpart3 = new BigInteger("0");
 
     public Vehicle(int id, int port) {
         pub_id = id;
@@ -286,6 +286,20 @@ public class Vehicle implements Runnable, Serializable {
 
     }
 
+    public Element H(BigInteger plainText) {
+        Element h = pairing.getG1().newElement();
+        try {
+            MessageDigest mdSha1 = MessageDigest.getInstance("SHA-1");
+            byte[] pSha = mdSha1.digest(plainText.toByteArray());
+            BigInteger no = new BigInteger(1, pSha);     //1 indicates positive number.
+            byte[] ba = no.toByteArray();
+            h = pairing.getG1().newElement().setFromHash(ba, 0, ba.length);
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        return h;
+    }
+
     public BigInteger H2(BigInteger plainText) throws Exception {
         MessageDigest mdSha1 = MessageDigest.getInstance("MD5");
         byte[] pSha = mdSha1.digest(plainText.toByteArray());
@@ -388,8 +402,8 @@ public class Vehicle implements Runnable, Serializable {
                         byte[] elementbytes = resdp.getPrivateKey();
                         Element ViPriv_Key = pairing.getG1().newElement();
                         ViPriv_Key.setFromBytes(elementbytes);
-                        KVa_Vi = pairing.pairing(Sv, ViPriv_Key);
-                        System.out.println("Va established.Session Key with one of Vi");
+                        KVa_Vi = pairing.pairing(H(V_id), ViPriv_Key);
+                        System.out.println("Va established.Session Key with one of Vi"+KVa_Vi);
                         SessionKeys.add(KVa_Vi);
                         while (Alphai == null || Kd == null) {
                             // do nothing
@@ -487,7 +501,7 @@ public class Vehicle implements Runnable, Serializable {
             BigInteger Q = primelist.get(0);
             System.out.println(primelist);
             for (int i = 1; i < primelist.size(); i++) {
-                Q=Q.multiply(primelist.get(i));
+                Q = Q.multiply(primelist.get(i));
             }
             System.out.println("Q=" + Q);
             for (int i = 0; i < threads.size(); i++) {
@@ -527,13 +541,13 @@ public class Vehicle implements Runnable, Serializable {
                     byte[] elementbytes = resdp.getPrivateKey();
                     Element RSUPriv_Key = pairing.getG1().newElement();
                     RSUPriv_Key.setFromBytes(elementbytes);
-                    KVa_RSU = pairing.pairing(Sv, RSUPriv_Key);
+                    KVa_RSU = pairing.pairing(H(V_id), RSUPriv_Key);
                     System.out.println("Va established session Key with RSU");
 
                     //Sending Query request
                     BigInteger ma = new BigInteger(8, rnd);
                     BigInteger part1_a1 = ma.multiply(Alpha_a);
-                    miaisum=miaisum.add(part1_a1);
+                    miaisum = miaisum.add(part1_a1);
                     LocalDateTime datetime = LocalDateTime.now();
                     DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
                     String formattedDate = datetime.format(myFormatObj);
@@ -542,7 +556,7 @@ public class Vehicle implements Runnable, Serializable {
                     String forPart2_a1 = KVa_RSU.toBigInteger().toString() + "1" + TS.toString();
                     BigInteger part2_a1 = H2(new BigInteger(forPart2_a1));
                     BigInteger part3_a1 = new BigInteger("0");
-                    System.out.println("NO of Session keys"+SessionKeys.size());
+                    System.out.println("NO of Session keys" + SessionKeys.size());
                     for (int i = 0; i < SessionKeys.size(); i++) {
                         String forPart3_a1 = SessionKeys.get(i).toBigInteger().toString() + "2" + TS.toString();
                         part3_a1 = part3_a1.add(H2(new BigInteger(forPart3_a1))).mod(q);
@@ -551,8 +565,8 @@ public class Vehicle implements Runnable, Serializable {
                     Ca_1 = Ca_1.add(part2_a1);
                     Ca_1 = Ca_1.subtract(part3_a1);
                     //Ca_1 = Ca_1;
-                    
-                    Ca1=Ca_1;
+
+                    Ca1 = Ca_1;
                     // part1_a2 is Kd 
                     String forPart2_a2 = KVa_RSU.toBigInteger().toString() + "3" + TS.toString();
                     BigInteger part2_a2 = H2(new BigInteger(forPart2_a2)).mod(q);
@@ -564,7 +578,7 @@ public class Vehicle implements Runnable, Serializable {
                     //System.out.println("HMAC from Va"+macinput);
                     BigInteger MACi = HMAC(macinput);
                     DataPacket6 query = new DataPacket6(BigInteger.valueOf(pub_id), Ca_1, Ca_2, primelist, TS, MACi);
-                    
+
                     String forpart3 = KVa_RSU.toBigInteger().toString() + "1" + TS.toString();
                     Mpart3 = Mpart3.add(H2(new BigInteger(forpart3)));
                     out.writeObject(query);
@@ -612,8 +626,8 @@ public class Vehicle implements Runnable, Serializable {
                 byte[] elementbytes = dp.getPrivateKey();
                 Element VaPriv_Key = pairing.getG1().newElement();
                 VaPriv_Key.setFromBytes(elementbytes);
-                KVa_Vi = pairing.pairing(Sv, VaPriv_Key);
-                System.out.println("Session Key Established.");
+                KVa_Vi = pairing.pairing(H(V_id), VaPriv_Key);
+                System.out.println("Session Key Established with Va: "+KVa_Vi);
                 //System.out.println("Class Name : "+KVa_Vi.getClass().getName()+"BigInteger Value: "+KVa_Vi.toBigInteger()+"\n Bit length: "+KVa_Vi.toBigInteger().bitLength());
                 sleep(5000);
                 //
@@ -685,7 +699,7 @@ public class Vehicle implements Runnable, Serializable {
                     byte[] elementbytes = resdp.getPrivateKey();
                     Element RSUPriv_Key = pairing.getG1().newElement();
                     RSUPriv_Key.setFromBytes(elementbytes);
-                    KVi_RSU = pairing.pairing(Sv, RSUPriv_Key);
+                    KVi_RSU = pairing.pairing(H(V_id), RSUPriv_Key);
                     System.out.println("Vi established session Key with RSU");
 
                     //Sending Query request
@@ -703,7 +717,7 @@ public class Vehicle implements Runnable, Serializable {
                     BigInteger part3 = H2(new BigInteger(forPart3)).mod(q);
 
                     BigInteger Ci = part1;
-                    miaisum=miaisum.add(part1);
+                    miaisum = miaisum.add(part1);
                     Ci = Ci.add(part2);
                     Ci = Ci.add(part3);
                     //Ci = Ci.mod(q);
@@ -718,7 +732,6 @@ public class Vehicle implements Runnable, Serializable {
                     System.out.println("Query Request Sent from Vi");
                     System.out.println("Data Identifier Vi Sent: " + mi);
                     //Query Request Sent
-                    
 
                     flag = false;
                     soc.close();
@@ -732,7 +745,7 @@ public class Vehicle implements Runnable, Serializable {
                 }
             }
         }
-        System.out.println("M calculated in V:"+miaisum);
+        System.out.println("M calculated in V:" + miaisum);
         System.out.println("Vehicle " + pub_id + " done");
     }
 
