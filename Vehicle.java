@@ -552,6 +552,7 @@ public class Vehicle implements Runnable, Serializable {
                     
                     
                     String macinput = KVa_RSU.toBigInteger().toString() + Ca_1.toString() + Ca_2.toString()+ primelist + TS.toString();
+                    //System.out.println("HMAC from Va"+macinput);
                     BigInteger MACi = HMAC(macinput);
                     DataPacket6 query = new DataPacket6(V_id, Ca_1, Ca_2,primelist, TS, MACi);
                     out.writeObject(query);

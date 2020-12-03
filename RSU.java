@@ -208,7 +208,8 @@ public class RSU implements Runnable, Serializable {
                     BigInteger Ca_1 = query.getCa_1();
                     BigInteger Ca_2 = query.getCa_2();
                     List<BigInteger> primeslist = query.getPrimes();
-                    String macinput = KVx_RSU.toBigInteger().toString() + Ca_1.toString() + Ca_2.toString() + primes + TS.toString();
+                    String macinput = KVx_RSU.toBigInteger().toString() + Ca_1.toString() + Ca_2.toString() + primeslist + TS.toString();
+                    
                     BigInteger MAC = HMAC(macinput);
                     if (MAC.equals(recievedMAC)) {
                         System.out.println("Packet received from Va is Valid ");
@@ -226,6 +227,7 @@ public class RSU implements Runnable, Serializable {
                         Kd = Ca_2.subtract(partKd_2);
                     } else {
                         System.out.println("Packet received from Va is Invalid ");
+                        System.out.println(macinput);
                     }
                 }
                 queryDone++;
@@ -298,7 +300,7 @@ public class RSU implements Runnable, Serializable {
                 Thread t = new VehicleHandler(socket, in, out);
                 t.start();
             } catch (SocketTimeoutException e) {
-                System.out.println("RSU not getting any queries\ncount="+count+"queryDone="+queryDone+"Kd = "+Kd);
+                System.out.println("RSU not getting any queries");//\ncount="+count+"queryDone="+queryDone+"Kd = "+Kd);
                 if(Kd!=null && count == queryDone)
                     break;
                 
