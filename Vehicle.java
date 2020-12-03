@@ -50,6 +50,10 @@ public class Vehicle implements Runnable, Serializable {
     BigInteger q = null;
     private boolean isVa;
     public int port; //For receiving and sending.
+    BigInteger miaisum=new BigInteger("0");
+    static BigInteger sigmaCi=new BigInteger("0");
+    static BigInteger Ca1=null;
+    static BigInteger Mpart3=new BigInteger("0");
 
     public Vehicle(int id, int port) {
         pub_id = id;
@@ -165,7 +169,6 @@ public class Vehicle implements Runnable, Serializable {
 
     }
 
-
     static class DataPacket5 implements QueryRequestPacketVi {
 
         BigInteger Vi, Ci, TS, MACi;
@@ -198,17 +201,17 @@ public class Vehicle implements Runnable, Serializable {
         }
 
     }
-    
+
     static class DataPacket6 implements QueryRequestPacketVa {
 
-        BigInteger Va, Ca_1,Ca_2, TS,MACa;
+        BigInteger Va, Ca_1, Ca_2, TS, MACa;
         List<BigInteger> primes;
 
         public DataPacket6(BigInteger Va, BigInteger Ca_1, BigInteger Ca_2, List<BigInteger> primes, BigInteger TS, BigInteger MACa) {
             this.Va = Va;
             this.Ca_1 = Ca_1;
             this.Ca_2 = Ca_2;
-            this.primes=primes;
+            this.primes = primes;
             this.TS = TS;
             this.MACa = MACa;
         }
@@ -227,7 +230,7 @@ public class Vehicle implements Runnable, Serializable {
         public BigInteger getCa_1() {
             return Ca_1;
         }
-        
+
         @Override
         public BigInteger getCa_2() {
             return Ca_2;
@@ -244,7 +247,7 @@ public class Vehicle implements Runnable, Serializable {
         }
 
     }
-    
+
     public void multicast(SessionKeyPacket request) throws IOException, InterruptedException {
         DatagramSocket socket = null;
         InetAddress group;
@@ -481,10 +484,12 @@ public class Vehicle implements Runnable, Serializable {
             //First k-1 prime numbers are for Vi's. And last prime is for Va.
             Random rnd = new Random();
             BigInteger Kd = new BigInteger(128, rnd);
-            BigInteger Q = new BigInteger("1");
-            for (int i = 0; i < primelist.size(); i++) {
-                Q = Q.multiply(primelist.get(i));
+            BigInteger Q = primelist.get(0);
+            System.out.println(primelist);
+            for (int i = 1; i < primelist.size(); i++) {
+                Q=Q.multiply(primelist.get(i));
             }
+            System.out.println("Q=" + Q);
             for (int i = 0; i < threads.size(); i++) {
                 BigInteger qi = primelist.get(i);
                 BigInteger Qi = Q.divide(qi);
@@ -528,6 +533,7 @@ public class Vehicle implements Runnable, Serializable {
                     //Sending Query request
                     BigInteger ma = new BigInteger(8, rnd);
                     BigInteger part1_a1 = ma.multiply(Alpha_a);
+                    miaisum=miaisum.add(part1_a1);
                     LocalDateTime datetime = LocalDateTime.now();
                     DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
                     String formattedDate = datetime.format(myFormatObj);
@@ -536,29 +542,35 @@ public class Vehicle implements Runnable, Serializable {
                     String forPart2_a1 = KVa_RSU.toBigInteger().toString() + "1" + TS.toString();
                     BigInteger part2_a1 = H2(new BigInteger(forPart2_a1));
                     BigInteger part3_a1 = new BigInteger("0");
+                    System.out.println("NO of Session keys"+SessionKeys.size());
                     for (int i = 0; i < SessionKeys.size(); i++) {
                         String forPart3_a1 = SessionKeys.get(i).toBigInteger().toString() + "2" + TS.toString();
-                        part3_a1 = part3_a1.add(H2((new BigInteger(forPart3_a1))).mod(q));
+                        part3_a1 = part3_a1.add(H2(new BigInteger(forPart3_a1))).mod(q);
                     }
                     BigInteger Ca_1 = part1_a1;
                     Ca_1 = Ca_1.add(part2_a1);
                     Ca_1 = Ca_1.subtract(part3_a1);
+                    //Ca_1 = Ca_1;
                     
+                    Ca1=Ca_1;
                     // part1_a2 is Kd 
-                    String forPart2_a2=KVa_RSU.toBigInteger().toString() + "3" + TS.toString();
-                    BigInteger part2_a2=(H2(new BigInteger(forPart2_a2))).mod(q);
-                    BigInteger Ca_2=Kd;
+                    String forPart2_a2 = KVa_RSU.toBigInteger().toString() + "3" + TS.toString();
+                    BigInteger part2_a2 = H2(new BigInteger(forPart2_a2)).mod(q);
+                    BigInteger Ca_2 = Kd;
                     Ca_2 = Ca_2.add(part2_a2);
-                    
-                    
-                    String macinput = KVa_RSU.toBigInteger().toString() + Ca_1.toString() + Ca_2.toString()+ primelist + TS.toString();
+                    //Ca_2 = Ca_2.mod(q);
+
+                    String macinput = KVa_RSU.toBigInteger().toString() + Ca_1.toString() + Ca_2.toString() + primelist + TS.toString();
                     //System.out.println("HMAC from Va"+macinput);
                     BigInteger MACi = HMAC(macinput);
-                    DataPacket6 query = new DataPacket6(V_id, Ca_1, Ca_2,primelist, TS, MACi);
+                    DataPacket6 query = new DataPacket6(BigInteger.valueOf(pub_id), Ca_1, Ca_2, primelist, TS, MACi);
+                    
+                    String forpart3 = KVa_RSU.toBigInteger().toString() + "1" + TS.toString();
+                    Mpart3 = Mpart3.add(H2(new BigInteger(forpart3)));
                     out.writeObject(query);
                     sleep(500);
                     System.out.println("Query Request Sent from Vi");
-                    System.out.println("Data Identifier Va Sent: "+ma);                    
+                    System.out.println("Data Identifier Va Sent: " + ma);
                     //Query Request Sent
 
                     flag = false;
@@ -678,7 +690,7 @@ public class Vehicle implements Runnable, Serializable {
 
                     //Sending Query request
                     Random rnd = new Random();
-                    BigInteger mi = new BigInteger(8, rnd);                  
+                    BigInteger mi = new BigInteger(8, rnd);
                     BigInteger part1 = mi.multiply(Alphai);
                     LocalDateTime datetime = LocalDateTime.now();
                     DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
@@ -688,19 +700,25 @@ public class Vehicle implements Runnable, Serializable {
                     String forPart2 = KVi_RSU.toBigInteger().toString() + "1" + TS.toString();
                     BigInteger part2 = H2(new BigInteger(forPart2));
                     String forPart3 = KVa_Vi.toBigInteger().toString() + "2" + TS.toString();
-                    BigInteger part3 = (H2(new BigInteger(forPart3))).mod(q);
-                  
+                    BigInteger part3 = H2(new BigInteger(forPart3)).mod(q);
+
                     BigInteger Ci = part1;
+                    miaisum=miaisum.add(part1);
                     Ci = Ci.add(part2);
                     Ci = Ci.add(part3);
+                    //Ci = Ci.mod(q);
+                    sigmaCi = sigmaCi.add(Ci);
                     String macinput = KVi_RSU.toBigInteger().toString() + Ci.toString() + TS.toString();
                     BigInteger MACi = HMAC(macinput);
-                    DataPacket5 query = new DataPacket5(V_id, Ci, TS, MACi);
+                    DataPacket5 query = new DataPacket5(BigInteger.valueOf(pub_id), Ci, TS, MACi);
+                    String forpart3 = KVi_RSU.toBigInteger().toString() + "1" + TS.toString();
+                    Mpart3 = Mpart3.add(H2(new BigInteger(forpart3)));
                     out.writeObject(query);
                     sleep(500);
                     System.out.println("Query Request Sent from Vi");
-                    System.out.println("Data Identifier Va Sent: "+mi);
+                    System.out.println("Data Identifier Vi Sent: " + mi);
                     //Query Request Sent
+                    
 
                     flag = false;
                     soc.close();
@@ -714,7 +732,7 @@ public class Vehicle implements Runnable, Serializable {
                 }
             }
         }
-
+        System.out.println("M calculated in V:"+miaisum);
         System.out.println("Vehicle " + pub_id + " done");
     }
 

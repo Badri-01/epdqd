@@ -203,6 +203,7 @@ public class CCM implements Runnable, Serializable {
         Ppub = P.mulZn(s);
         Random rnd = new Random();
         q = BigInteger.probablePrime(1024, rnd);
+        //System.out.println(q);
         boolean flag = true;
         try {
             serverSock = new ServerSocket(port);

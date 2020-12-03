@@ -46,8 +46,10 @@ public class RSU implements Runnable, Serializable {
     private BigInteger q = null;
     protected ServerSocket serverSock = null;
     protected Socket socket = null;
-    private BigInteger M = null;
-    private BigInteger Q = null;
+    private BigInteger sigmaCi=new BigInteger("0");
+    private BigInteger Ca1=null;
+    private BigInteger part3=new BigInteger("0");
+    private BigInteger Q ;
     private BigInteger Kd = null;
     private List<BigInteger> primes;
     private int queryDone = 0;
@@ -166,9 +168,9 @@ public class RSU implements Runnable, Serializable {
                 String type = dp.typeOfPacket();
                 System.out.println("RSU received packet= " + type);
                 byte[] elementbytes = dp.getPrivateKey();
-                Element ViPriv_Key = pairing.getG1().newElement();
-                ViPriv_Key.setFromBytes(elementbytes);
-                KVx_RSU = pairing.pairing(Srsu, ViPriv_Key);
+                Element VxPriv_Key = pairing.getG1().newElement();
+                VxPriv_Key.setFromBytes(elementbytes);
+                KVx_RSU = pairing.pairing(Srsu, VxPriv_Key);
                 SessionKeyPacket resdp = new DataPacket4("Session Key Establishment", Srsu.toBytes());
                 out.writeObject(resdp);
                 sleep(500);
@@ -178,7 +180,7 @@ public class RSU implements Runnable, Serializable {
                     QueryRequestPacketVi query = (QueryRequestPacketVi) in.readObject();
                     System.out.println("Query received from vi");
                     BigInteger recievedMAC = query.getMACi();
-                    BigInteger TS = query.getTS();
+                    BigInteger TS = query.getTS();  
                     BigInteger Ci = query.getCi();
                     String macinput = KVx_RSU.toBigInteger().toString() + Ci.toString() + TS.toString();
                     BigInteger MAC = HMAC(macinput);
@@ -186,14 +188,9 @@ public class RSU implements Runnable, Serializable {
                     //Query aggregation and reading 
                     if (MAC.equals(recievedMAC)) {
                         System.out.println("Packet received from Vi is Valid ");
-                        if (M == null) {
-                            M = Ci;
-                        } else {
-                            M.add(Ci);
-                        }
-                        String forpart3 = KVx_RSU.toBigInteger().toString() + "1" + TS.toString();
-                        BigInteger part3 = H2(new BigInteger(forpart3));
-                        M.subtract(part3);
+                        sigmaCi=sigmaCi.add(Ci);
+                        String forpart3 = KVx_RSU.toBigInteger().toString() + "1" + TS.toString();                    
+                        part3 = part3.add(H2(new BigInteger(forpart3)));
 
                     } else {
                         System.out.println("Packet received from Vi is Invalid ");
@@ -209,22 +206,18 @@ public class RSU implements Runnable, Serializable {
                     BigInteger Ca_2 = query.getCa_2();
                     List<BigInteger> primeslist = query.getPrimes();
                     String macinput = KVx_RSU.toBigInteger().toString() + Ca_1.toString() + Ca_2.toString() + primeslist + TS.toString();
-                    
+
                     BigInteger MAC = HMAC(macinput);
                     if (MAC.equals(recievedMAC)) {
                         System.out.println("Packet received from Va is Valid ");
                         primes = primeslist;
-                        if (M == null) {
-                            M = Ca_1;
-                        } else {
-                            M.add(Ca_1);
-                        }
+                        Ca1=Ca_1;
                         String forpart3 = KVx_RSU.toBigInteger().toString() + "1" + TS.toString();
-                        BigInteger part3 = H2(new BigInteger(forpart3));
-                        M.subtract(part3);
-                        String forpartKd_2 = KVx_RSU.toBigInteger().toString() + "1" + TS.toString();
+                        part3 = part3.add(H2(new BigInteger(forpart3)));
+                        String forpartKd_2 = KVx_RSU.toBigInteger().toString() + "3" + TS.toString();
                         BigInteger partKd_2 = H2(new BigInteger(forpartKd_2));
                         Kd = Ca_2.subtract(partKd_2);
+                        Kd = Kd.mod(q);
                     } else {
                         System.out.println("Packet received from Va is Invalid ");
                         System.out.println(macinput);
@@ -301,9 +294,10 @@ public class RSU implements Runnable, Serializable {
                 t.start();
             } catch (SocketTimeoutException e) {
                 System.out.println("RSU not getting any queries");//\ncount="+count+"queryDone="+queryDone+"Kd = "+Kd);
-                if(Kd!=null && count == queryDone)
+                if (Kd != null && count == queryDone) {
                     break;
-                
+                }
+
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -312,19 +306,27 @@ public class RSU implements Runnable, Serializable {
 
         BigInteger Q = primes.get(0);
         for (int i = 1; i < primes.size(); i++) {
-            Q.multiply(primes.get(i));
+            Q = Q.multiply(primes.get(i));
         }
-        
-        List<BigInteger> dataIdentifiers=new ArrayList<>();
-        for(int i=0;i<primes.size();i++){
+        System.out.println("sigmaCi="+sigmaCi+"\nCa1="+Ca1+"\npart3="+part3);
+        BigInteger M=new BigInteger("0");
+        M=M.add(sigmaCi);
+        M=M.add(Ca1);
+        M=M.subtract(part3.mod(q));
+        //M = M.mod(q);
+        //System.out.println(primes);
+        List<BigInteger> dataIdentifiers = new ArrayList<>();
+        for (int i = 0; i < primes.size(); i++) {
             BigInteger temp = M.mod(Q);
             dataIdentifiers.add(temp.mod(primes.get(i)));
         }
+        System.out.println("Q=" + Q + "\nM=" + M);
         System.out.println("Data Identifiers Obtained :");
-        for(int i=0;i<dataIdentifiers.size();i++){
-            System.out.println("m1 ="+dataIdentifiers.get(i));
+        for (int i = 0; i < dataIdentifiers.size(); i++) {
+            System.out.println("m" + (i + 1) + " =" + dataIdentifiers.get(i));
         }
         System.out.println("RSU done");
+        System.out.println("sigmaCi in v:"+Vehicle.sigmaCi+"\nCa1 in v:"+Vehicle.Ca1+"\nMpart3 in v:"+Vehicle.Mpart3);
     }
 
     public Pairing generatePairing(String params) {
