@@ -284,7 +284,7 @@ public class Vehicle implements Runnable, Serializable {
     }
 
     public BigInteger H2(BigInteger plainText) throws Exception {
-        MessageDigest mdSha1 = MessageDigest.getInstance("MD-5");
+        MessageDigest mdSha1 = MessageDigest.getInstance("MD5");
         byte[] pSha = mdSha1.digest(plainText.toByteArray());
         BigInteger no = new BigInteger(1, pSha);     //1 indicates positive number.
         byte[] ba = no.toByteArray();

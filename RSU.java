@@ -130,7 +130,7 @@ public class RSU implements Runnable, Serializable {
     }
 
     public BigInteger H2(BigInteger plainText) throws Exception {
-        MessageDigest mdSha1 = MessageDigest.getInstance("MD-5");
+        MessageDigest mdSha1 = MessageDigest.getInstance("MD5");
         byte[] pSha = mdSha1.digest(plainText.toByteArray());
         BigInteger no = new BigInteger(1, pSha);     //1 indicates positive number.
         byte[] ba = no.toByteArray();
@@ -298,15 +298,12 @@ public class RSU implements Runnable, Serializable {
                 Thread t = new VehicleHandler(socket, in, out);
                 t.start();
             } catch (SocketTimeoutException e) {
-                System.out.println("RSU not getting any queries.");
+                System.out.println("RSU not getting any queries\ncount="+count+"queryDone="+queryDone+"Kd = "+Kd);
+                if(Kd!=null && count == queryDone)
+                    break;
+                
             } catch (Exception e) {
                 e.printStackTrace();
-            }
-        }
-        while (count != queryDone) {
-            try {
-                sleep(100);
-            } catch (Exception e) {
             }
         }
         // Response to the queries.
