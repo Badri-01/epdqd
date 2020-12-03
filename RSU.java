@@ -322,7 +322,7 @@ public class RSU implements Runnable, Serializable {
         for (int i = 1; i < primes.size(); i++) {
             Q = Q.multiply(primes.get(i));
         }
-        System.out.println("sigmaCi="+sigmaCi+"\nCa1="+Ca1+"\npart3="+part3);
+        //System.out.println("sigmaCi="+sigmaCi+"\nCa1="+Ca1+"\npart3="+part3);
         BigInteger M=new BigInteger("0");
         M=M.add(sigmaCi);
         M=M.add(Ca1);
@@ -334,13 +334,13 @@ public class RSU implements Runnable, Serializable {
             BigInteger temp = M.mod(Q);
             dataIdentifiers.add(temp.mod(primes.get(i)));
         }
-        System.out.println("Q=" + Q + "\nM=" + M);
+        //System.out.println("Q=" + Q + "\nM=" + M);
         System.out.println("Data Identifiers Obtained :");
         for (int i = 0; i < dataIdentifiers.size(); i++) {
             System.out.println("m" + (i + 1) + " =" + dataIdentifiers.get(i));
         }
         System.out.println("RSU done");
-        System.out.println("sigmaCi in v:"+Vehicle.sigmaCi+"\nCa1 in v:"+Vehicle.Ca1+"\nMpart3 in v:"+Vehicle.Mpart3);
+        //System.out.println("sigmaCi in v:"+Vehicle.sigmaCi+"\nCa1 in v:"+Vehicle.Ca1+"\nMpart3 in v:"+Vehicle.Mpart3);
     }
 
     public Pairing generatePairing(String params) {

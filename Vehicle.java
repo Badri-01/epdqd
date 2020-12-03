@@ -50,10 +50,11 @@ public class Vehicle implements Runnable, Serializable {
     BigInteger q = null;
     private boolean isVa;
     public int port; //For receiving and sending.
-    BigInteger miaisum = new BigInteger("0");
-    static BigInteger sigmaCi = new BigInteger("0");
-    static BigInteger Ca1 = null;
-    static BigInteger Mpart3 = new BigInteger("0");
+    private static boolean firstTS = true;
+    private static String ts;
+    //static BigInteger sigmaCi = new BigInteger("0");
+    //static BigInteger Ca1 = null;
+    //static BigInteger Mpart3 = new BigInteger("0");
 
     public Vehicle(int id, int port) {
         pub_id = id;
@@ -266,6 +267,20 @@ public class Vehicle implements Runnable, Serializable {
         socket.close();
     }
 
+    public String getTimeStamp() {
+        if (firstTS) {
+            firstTS=false;
+            LocalDateTime datetime = LocalDateTime.now();
+            //System.out.println("TimeStamp:" + datetime);
+            DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
+            String formattedDate = datetime.format(myFormatObj);
+            //System.out.println("After formatting: " + formattedDate);
+            BigInteger TS = new BigInteger(formattedDate);
+            ts=TS.toString();
+        }
+        return ts;
+    }
+
     public static BigInteger E(BigInteger key, BigInteger clearText) throws Exception {
 
         Cipher rc4 = Cipher.getInstance("RC4");
@@ -403,17 +418,17 @@ public class Vehicle implements Runnable, Serializable {
                         Element ViPriv_Key = pairing.getG1().newElement();
                         ViPriv_Key.setFromBytes(elementbytes);
                         KVa_Vi = pairing.pairing(H(V_id), ViPriv_Key);
-                        System.out.println("Va established.Session Key with one of Vi"+KVa_Vi);
+                        System.out.println("Va established.Session Key with one of Vi");
                         SessionKeys.add(KVa_Vi);
                         while (Alphai == null || Kd == null) {
                             // do nothing
                             sleep(100);
                         }
                         LocalDateTime datetime = LocalDateTime.now();
-                        System.out.println("TimeStamp:" + datetime);
+                        //System.out.println("TimeStamp:" + datetime);
                         DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
                         String formattedDate = datetime.format(myFormatObj);
-                        System.out.println("After formatting: " + formattedDate);
+                        //System.out.println("After formatting: " + formattedDate);
                         BigInteger TS = new BigInteger(formattedDate);
                         BigInteger key = new BigInteger(KVa_Vi.toBigInteger().toString() + TS.toString());
                         BigInteger cipherAlphai = E(key, Alphai);
@@ -421,7 +436,7 @@ public class Vehicle implements Runnable, Serializable {
                         String macinput = KVa_Vi.toBigInteger().toString() + cipherAlphai.toString() + cipherKd.toString() + TS.toString();
                         BigInteger MACai = HMAC(macinput);
                         DataPacket3 dp = new DataPacket3(cipherAlphai, cipherKd, TS, MACai);
-                        System.out.println("Alphai sent: " + Alphai + "\nKd sent: " + Kd);
+                        //System.out.println("Alphai sent: " + Alphai + "\nKd sent: " + Kd);
                         out.writeObject(dp);
                         soc.close();
                         this.in.close();
@@ -547,40 +562,35 @@ public class Vehicle implements Runnable, Serializable {
                     //Sending Query request
                     BigInteger ma = new BigInteger(8, rnd);
                     BigInteger part1_a1 = ma.multiply(Alpha_a);
-                    miaisum = miaisum.add(part1_a1);
-                    LocalDateTime datetime = LocalDateTime.now();
-                    DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
-                    String formattedDate = datetime.format(myFormatObj);
-                    //System.out.println("After formatting: " + formattedDate);
-                    BigInteger TS = new BigInteger(formattedDate);
+                    BigInteger TS = new BigInteger(getTimeStamp());
                     String forPart2_a1 = KVa_RSU.toBigInteger().toString() + "1" + TS.toString();
                     BigInteger part2_a1 = H2(new BigInteger(forPart2_a1));
                     BigInteger part3_a1 = new BigInteger("0");
-                    System.out.println("NO of Session keys" + SessionKeys.size());
-                    for (int i = 0; i < SessionKeys.size(); i++) {
-                        String forPart3_a1 = SessionKeys.get(i).toBigInteger().toString() + "2" + TS.toString();
-                        part3_a1 = part3_a1.add(H2(new BigInteger(forPart3_a1))).mod(q);
-                    }
+                    //System.out.println("NO of Session keys" + SessionKeys.size());
                     BigInteger Ca_1 = part1_a1;
                     Ca_1 = Ca_1.add(part2_a1);
+                    //System.out.println("Ca_1\nmaAa=" + part1_a1 + "\nH2(KVa,RSU∥1∥TS)=" + part2_a1);
+                    for (int i = 0; i < SessionKeys.size(); i++) {
+                        String forPart3_a1 = SessionKeys.get(i).toBigInteger().toString() + "2" + TS.toString();
+                        BigInteger temp = H2(new BigInteger(forPart3_a1));
+                        //System.out.println("H2(KVi,Va∥2∥TS) mod q = " + temp);
+                        part3_a1 = part3_a1.add(temp).mod(q);
+                    }
                     Ca_1 = Ca_1.subtract(part3_a1);
-                    //Ca_1 = Ca_1;
-
-                    Ca1 = Ca_1;
+                    //Ca1 = Ca_1;
                     // part1_a2 is Kd 
                     String forPart2_a2 = KVa_RSU.toBigInteger().toString() + "3" + TS.toString();
                     BigInteger part2_a2 = H2(new BigInteger(forPart2_a2)).mod(q);
                     BigInteger Ca_2 = Kd;
                     Ca_2 = Ca_2.add(part2_a2);
                     //Ca_2 = Ca_2.mod(q);
-
                     String macinput = KVa_RSU.toBigInteger().toString() + Ca_1.toString() + Ca_2.toString() + primelist + TS.toString();
                     //System.out.println("HMAC from Va"+macinput);
                     BigInteger MACi = HMAC(macinput);
                     DataPacket6 query = new DataPacket6(BigInteger.valueOf(pub_id), Ca_1, Ca_2, primelist, TS, MACi);
 
                     String forpart3 = KVa_RSU.toBigInteger().toString() + "1" + TS.toString();
-                    Mpart3 = Mpart3.add(H2(new BigInteger(forpart3)));
+                    //Mpart3 = Mpart3.add(H2(new BigInteger(forpart3)));
                     out.writeObject(query);
                     sleep(500);
                     System.out.println("Query Request Sent from Vi");
@@ -627,7 +637,7 @@ public class Vehicle implements Runnable, Serializable {
                 Element VaPriv_Key = pairing.getG1().newElement();
                 VaPriv_Key.setFromBytes(elementbytes);
                 KVa_Vi = pairing.pairing(H(V_id), VaPriv_Key);
-                System.out.println("Session Key Established with Va: "+KVa_Vi);
+                System.out.println("Session Key Established with Va");
                 //System.out.println("Class Name : "+KVa_Vi.getClass().getName()+"BigInteger Value: "+KVa_Vi.toBigInteger()+"\n Bit length: "+KVa_Vi.toBigInteger().bitLength());
                 sleep(5000);
                 //
@@ -666,7 +676,7 @@ public class Vehicle implements Runnable, Serializable {
                     Alphai = D(key, cipherAlphai);
                     Kd = D(key, cipherKd);
                     System.out.println("Alphai and Kd are received");
-                    System.out.println("Alphai received: " + Alphai + "\nKd received: " + Kd);
+                    //System.out.println("Alphai received: " + Alphai + "\nKd received: " + Kd);
                     flag = false;
                     soc.close();
                     out.close();
@@ -706,27 +716,22 @@ public class Vehicle implements Runnable, Serializable {
                     Random rnd = new Random();
                     BigInteger mi = new BigInteger(8, rnd);
                     BigInteger part1 = mi.multiply(Alphai);
-                    LocalDateTime datetime = LocalDateTime.now();
-                    DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
-                    String formattedDate = datetime.format(myFormatObj);
-                    //System.out.println("After formatting: " + formattedDate);
-                    BigInteger TS = new BigInteger(formattedDate);
+                    BigInteger TS = new BigInteger(getTimeStamp());
                     String forPart2 = KVi_RSU.toBigInteger().toString() + "1" + TS.toString();
                     BigInteger part2 = H2(new BigInteger(forPart2));
                     String forPart3 = KVa_Vi.toBigInteger().toString() + "2" + TS.toString();
                     BigInteger part3 = H2(new BigInteger(forPart3)).mod(q);
-
+                    //System.out.println("Ci\nmiai=" + part1 + "\nH2(KVi,RSU∥1∥TS)=" + part2 + "\nH2(KVi,Va∥2∥TS) mod q=" + part3);
                     BigInteger Ci = part1;
-                    miaisum = miaisum.add(part1);
                     Ci = Ci.add(part2);
                     Ci = Ci.add(part3);
                     //Ci = Ci.mod(q);
-                    sigmaCi = sigmaCi.add(Ci);
+                    //sigmaCi = sigmaCi.add(Ci);
                     String macinput = KVi_RSU.toBigInteger().toString() + Ci.toString() + TS.toString();
                     BigInteger MACi = HMAC(macinput);
                     DataPacket5 query = new DataPacket5(BigInteger.valueOf(pub_id), Ci, TS, MACi);
-                    String forpart3 = KVi_RSU.toBigInteger().toString() + "1" + TS.toString();
-                    Mpart3 = Mpart3.add(H2(new BigInteger(forpart3)));
+                    //String forpart3 = KVi_RSU.toBigInteger().toString() + "1" + TS.toString();
+                    //Mpart3 = Mpart3.add(H2(new BigInteger(forpart3)));
                     out.writeObject(query);
                     sleep(500);
                     System.out.println("Query Request Sent from Vi");
@@ -745,7 +750,6 @@ public class Vehicle implements Runnable, Serializable {
                 }
             }
         }
-        System.out.println("M calculated in V:" + miaisum);
         System.out.println("Vehicle " + pub_id + " done");
     }
 
