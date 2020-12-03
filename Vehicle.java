@@ -534,11 +534,11 @@ public class Vehicle implements Runnable, Serializable {
                     //System.out.println("After formatting: " + formattedDate);
                     BigInteger TS = new BigInteger(formattedDate);
                     String forPart2_a1 = KVa_RSU.toBigInteger().toString() + "1" + TS.toString();
-                    BigInteger part2_a1 = new BigInteger(forPart2_a1);
+                    BigInteger part2_a1 = H2(new BigInteger(forPart2_a1));
                     BigInteger part3_a1 = new BigInteger("0");
                     for (int i = 0; i < SessionKeys.size(); i++) {
                         String forPart3_a1 = SessionKeys.get(i).toBigInteger().toString() + "2" + TS.toString();
-                        part3_a1 = part3_a1.add((new BigInteger(forPart3_a1)).mod(q));
+                        part3_a1 = part3_a1.add(H2((new BigInteger(forPart3_a1))).mod(q));
                     }
                     BigInteger Ca_1 = part1_a1;
                     Ca_1 = Ca_1.add(part2_a1);
@@ -546,7 +546,7 @@ public class Vehicle implements Runnable, Serializable {
                     
                     // part1_a2 is Kd 
                     String forPart2_a2=KVa_RSU.toBigInteger().toString() + "3" + TS.toString();
-                    BigInteger part2_a2=(new BigInteger(forPart2_a2)).mod(q);
+                    BigInteger part2_a2=(H2(new BigInteger(forPart2_a2))).mod(q);
                     BigInteger Ca_2=Kd;
                     Ca_2 = Ca_2.add(part2_a2);
                     
@@ -557,6 +557,7 @@ public class Vehicle implements Runnable, Serializable {
                     out.writeObject(query);
                     sleep(500);
                     System.out.println("Query Request Sent from Vi");
+                    System.out.println("Data Identifier Va Sent: "+ma);                    
                     //Query Request Sent
 
                     flag = false;
@@ -676,7 +677,7 @@ public class Vehicle implements Runnable, Serializable {
 
                     //Sending Query request
                     Random rnd = new Random();
-                    BigInteger mi = new BigInteger(8, rnd);
+                    BigInteger mi = new BigInteger(8, rnd);                  
                     BigInteger part1 = mi.multiply(Alphai);
                     LocalDateTime datetime = LocalDateTime.now();
                     DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
@@ -684,9 +685,9 @@ public class Vehicle implements Runnable, Serializable {
                     //System.out.println("After formatting: " + formattedDate);
                     BigInteger TS = new BigInteger(formattedDate);
                     String forPart2 = KVi_RSU.toBigInteger().toString() + "1" + TS.toString();
-                    BigInteger part2 = new BigInteger(forPart2);
+                    BigInteger part2 = H2(new BigInteger(forPart2));
                     String forPart3 = KVa_Vi.toBigInteger().toString() + "2" + TS.toString();
-                    BigInteger part3 = (new BigInteger(forPart3)).mod(q);
+                    BigInteger part3 = (H2(new BigInteger(forPart3))).mod(q);
                   
                     BigInteger Ci = part1;
                     Ci = Ci.add(part2);
@@ -697,6 +698,7 @@ public class Vehicle implements Runnable, Serializable {
                     out.writeObject(query);
                     sleep(500);
                     System.out.println("Query Request Sent from Vi");
+                    System.out.println("Data Identifier Va Sent: "+mi);
                     //Query Request Sent
 
                     flag = false;

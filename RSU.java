@@ -23,6 +23,8 @@ import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.List;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -38,12 +40,17 @@ public class RSU implements Runnable, Serializable {
     private BigInteger RSU_id;
     private Element Srsu;
     private Pairing pairing;
-    public int port;
+    private int port;
     private InetAddress group;
     private byte[] buf;
-    BigInteger q=null;
+    private BigInteger q = null;
     protected ServerSocket serverSock = null;
-    Socket socket = null;
+    protected Socket socket = null;
+    private BigInteger M = null;
+    private BigInteger Q = null;
+    private BigInteger Kd = null;
+    private List<BigInteger> primes;
+    private int queryDone = 0;
 
     public RSU(int port) {
         this.port = port;
@@ -121,7 +128,15 @@ public class RSU implements Runnable, Serializable {
         }
 
     }
-    
+
+    public BigInteger H2(BigInteger plainText) throws Exception {
+        MessageDigest mdSha1 = MessageDigest.getInstance("MD-5");
+        byte[] pSha = mdSha1.digest(plainText.toByteArray());
+        BigInteger no = new BigInteger(1, pSha);     //1 indicates positive number.
+        byte[] ba = no.toByteArray();
+        return new BigInteger(ba);
+    }
+
     public BigInteger HMAC(String input) throws Exception {
         String key = "SECUREHMACKEY";
         Mac hmacSHA512 = Mac.getInstance("HmacSHA512");
@@ -160,36 +175,60 @@ public class RSU implements Runnable, Serializable {
                 out.flush();
                 if (type.equals("Vi Session Key Establishment")) {
                     System.out.println("RSU established session Key with one of Vi");
-                    QueryRequestPacketVi query= (QueryRequestPacketVi) in.readObject();
+                    QueryRequestPacketVi query = (QueryRequestPacketVi) in.readObject();
                     System.out.println("Query received from vi");
                     BigInteger recievedMAC = query.getMACi();
                     BigInteger TS = query.getTS();
                     BigInteger Ci = query.getCi();
                     String macinput = KVx_RSU.toBigInteger().toString() + Ci.toString() + TS.toString();
                     BigInteger MAC = HMAC(macinput);
+
+                    //Query aggregation and reading 
                     if (MAC.equals(recievedMAC)) {
                         System.out.println("Packet received from Vi is Valid ");
+                        if (M == null) {
+                            M = Ci;
+                        } else {
+                            M.add(Ci);
+                        }
+                        String forpart3 = KVx_RSU.toBigInteger().toString() + "1" + TS.toString();
+                        BigInteger part3 = H2(new BigInteger(forpart3));
+                        M.subtract(part3);
+
                     } else {
                         System.out.println("Packet received from Vi is Invalid ");
                     }
-                    
+
                 } else {
                     System.out.println("RSU established session Key with Va");
-                    QueryRequestPacketVa query= (QueryRequestPacketVa) in.readObject();
+                    QueryRequestPacketVa query = (QueryRequestPacketVa) in.readObject();
                     System.out.println("query received from va");
                     BigInteger recievedMAC = query.getMACa();
                     BigInteger TS = query.getTS();
                     BigInteger Ca_1 = query.getCa_1();
                     BigInteger Ca_2 = query.getCa_2();
-                    List<BigInteger> primes = query.getPrimes();
-                    String macinput = KVx_RSU.toBigInteger().toString() + Ca_1.toString() + Ca_2.toString()+ primes + TS.toString();
+                    List<BigInteger> primeslist = query.getPrimes();
+                    String macinput = KVx_RSU.toBigInteger().toString() + Ca_1.toString() + Ca_2.toString() + primes + TS.toString();
                     BigInteger MAC = HMAC(macinput);
                     if (MAC.equals(recievedMAC)) {
                         System.out.println("Packet received from Va is Valid ");
+                        primes = primeslist;
+                        if (M == null) {
+                            M = Ca_1;
+                        } else {
+                            M.add(Ca_1);
+                        }
+                        String forpart3 = KVx_RSU.toBigInteger().toString() + "1" + TS.toString();
+                        BigInteger part3 = H2(new BigInteger(forpart3));
+                        M.subtract(part3);
+                        String forpartKd_2 = KVx_RSU.toBigInteger().toString() + "1" + TS.toString();
+                        BigInteger partKd_2 = H2(new BigInteger(forpartKd_2));
+                        Kd = Ca_2.subtract(partKd_2);
                     } else {
                         System.out.println("Packet received from Va is Invalid ");
                     }
                 }
+                queryDone++;
 
             } catch (Exception e) {
                 System.out.println(e);
@@ -225,7 +264,7 @@ public class RSU implements Runnable, Serializable {
                 byte[] elementbytes = resdp.getPrivateKey();
                 Srsu = pairing.getG1().newElement();
                 Srsu.setFromBytes(elementbytes);
-                q=resdp.getq();
+                q = resdp.getq();
                 soc.close();
                 out.close();
                 in.close();
@@ -240,16 +279,18 @@ public class RSU implements Runnable, Serializable {
         flag = true;
         try {
             serverSock = new ServerSocket(9004);
-            serverSock.setSoTimeout(20000);
+            serverSock.setSoTimeout(5000);
             System.out.println("RSUReady");
         } catch (Exception e) {
             System.out.println(e);
         }
+        int count = 0;
         while (flag) {
             socket = null;
             try {
                 sleep(100);
                 socket = serverSock.accept();
+                count++;
                 //System.out.println("A new Vehicle is connected : " + socket);
                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
@@ -262,7 +303,28 @@ public class RSU implements Runnable, Serializable {
                 e.printStackTrace();
             }
         }
+        while (count != queryDone) {
+            try {
+                sleep(100);
+            } catch (Exception e) {
+            }
+        }
+        // Response to the queries.
 
+        BigInteger Q = primes.get(0);
+        for (int i = 1; i < primes.size(); i++) {
+            Q.multiply(primes.get(i));
+        }
+        
+        List<BigInteger> dataIdentifiers=new ArrayList<>();
+        for(int i=0;i<primes.size();i++){
+            BigInteger temp = M.mod(Q);
+            dataIdentifiers.add(temp.mod(primes.get(i)));
+        }
+        System.out.println("Data Identifiers Obtained :");
+        for(int i=0;i<dataIdentifiers.size();i++){
+            System.out.println("m1 ="+dataIdentifiers.get(i));
+        }
         System.out.println("RSU done");
     }
 
