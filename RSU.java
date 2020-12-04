@@ -196,10 +196,10 @@ public class RSU implements Runnable, Serializable {
         return h;
     }
 
-    public static String E(String key, String clearText) throws Exception {
+    public static String E(BigInteger key, String clearText) throws Exception {
 
         Cipher rc4 = Cipher.getInstance("RC4");
-        SecretKeySpec rc4Key = new SecretKeySpec(key.getBytes(), "RC4");
+        SecretKeySpec rc4Key = new SecretKeySpec(key.toByteArray(), "RC4");
         rc4.init(Cipher.ENCRYPT_MODE, rc4Key);
         byte[] cipherText = rc4.update(clearText.getBytes());
         return new String(cipherText);
@@ -228,7 +228,7 @@ public class RSU implements Runnable, Serializable {
             BigInteger d = dataIdentifiers.get(i);
             String s = d.toString();
             c = c + s;
-            String ans = "answer to " + s + "\n";
+            String ans = " : answer to " + s + "\n";
             c = c + ans;
         }
         return c;
@@ -412,7 +412,7 @@ public class RSU implements Runnable, Serializable {
             System.out.println("m" + (i + 1) + " =" + dataIdentifiers.get(i));
         }
         String content = getContent(dataIdentifiers);
-        System.out.println("content : " + content + "\nkd: " + Kd);
+        System.out.println("content :\n" + content );
 
         //multicast content...
         flag = true;
@@ -426,9 +426,10 @@ public class RSU implements Runnable, Serializable {
                 String formattedDate = datetime.format(myFormatObj);
                 BigInteger TS = new BigInteger(formattedDate);
                 String Key = Kd.toString() + TS.toString();
-                String Cm = E(Key, content);
-                //System.out.println("Cm : " + Cm);
-                String macinput = Kd.toString() + Cm.toString() + TS.toString();
+                String Cm = E(new BigInteger(Key), content);
+                
+                System.out.println("Cm : " + Cm);
+                String macinput = Kd.toString() + Cm + TS.toString();
                 BigInteger MACm = HMAC(macinput);
                 //System.out.println("mac : " + MACm);
                 ContentPacket con = new DataPacket7(Cm, TS, MACm);
