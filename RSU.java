@@ -17,19 +17,27 @@ import static java.lang.Thread.sleep;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.net.ConnectException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+//import java.net.MulticastSocket;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Random;
 import java.io.IOException;
 import java.net.ConnectException;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.net.SocketTimeoutException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-// import java.util.Date;
-// import java.time.LocalTime;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import javax.crypto.Cipher;
 
 /**
  *
@@ -130,7 +138,49 @@ public class RSU implements Runnable, Serializable {
         }
 
     }
-    
+    static class DataPacket7 implements ContentPacket {
+
+        BigInteger Cm,TS,MACm;
+
+        public DataPacket7(BigInteger Cm, BigInteger TS, BigInteger MACm) {
+            this.Cm = Cm;
+            this.TS = TS;
+            this.MACm = MACm;
+        }
+
+        @Override
+        public BigInteger getCm() {
+            return Cm;
+        }
+
+        @Override
+        public BigInteger getTS() {
+            return TS;
+        }
+
+        @Override
+        public BigInteger getMACm() {
+            return MACm;
+        }
+    }
+    public void multicast(ContentPacket request) throws IOException, InterruptedException {
+        DatagramSocket socket = null;
+        InetAddress group;
+        socket = new DatagramSocket();
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        ObjectOutputStream os = new ObjectOutputStream(outputStream);
+        os.flush();
+        os.writeObject(request);
+        sleep(500);
+        os.flush();
+        byte[] buf = outputStream.toByteArray();
+        group = InetAddress.getByName("230.0.0.0");
+        DatagramPacket packet = new DatagramPacket(buf, buf.length, group, 4446);
+        socket.send(packet);
+        os.close();
+        socket.close();
+    }
+
     public Element H(BigInteger plainText) {
         Element h = pairing.getG1().newElement();
         try {
@@ -145,6 +195,16 @@ public class RSU implements Runnable, Serializable {
         return h;
     }
 
+        public static BigInteger E(BigInteger key, String clearText) throws Exception {
+
+            Cipher rc4 = Cipher.getInstance("RC4");
+            SecretKeySpec rc4Key = new SecretKeySpec(key.toByteArray(), "RC4");
+            rc4.init(Cipher.ENCRYPT_MODE, rc4Key);
+             byte[] cipherText = rc4.update(clearText.getBytes());
+          return new BigInteger(cipherText);
+        }
+
+
     public BigInteger H2(BigInteger plainText) throws Exception {
         MessageDigest mdSha1 = MessageDigest.getInstance("MD5");
         byte[] pSha = mdSha1.digest(plainText.toByteArray());
@@ -158,8 +218,19 @@ public class RSU implements Runnable, Serializable {
         Mac hmacSHA512 = Mac.getInstance("HmacSHA512");
         SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "HmacSHA512");
         hmacSHA512.init(secretKeySpec);
-        byte[] digest = hmacSHA512.doFinal(input.getBytes());
-        return new BigInteger(digest);
+         byte[] digest = hmacSHA512.doFinal(input.getBytes());
+      return new BigInteger(digest);
+    }
+    public String getContent(List<BigInteger> dataIdentifiers){
+      String c="";
+      for(int i=0;i<dataIdentifiers.size();i++){
+        BigInteger d=dataIdentifiers.get(i);
+        String s=d.toString();
+        c=c+s;
+        String ans="answer"+i;
+        c=c+ans;
+      }
+      return c;
     }
 
     class VehicleHandler extends Thread {
@@ -194,16 +265,16 @@ public class RSU implements Runnable, Serializable {
                     QueryRequestPacketVi query = (QueryRequestPacketVi) in.readObject();
                     System.out.println("Query received from vi");
                     BigInteger recievedMAC = query.getMACi();
-                    BigInteger TS = query.getTS();  
+                    BigInteger TS = query.getTS();
                     BigInteger Ci = query.getCi();
                     String macinput = KVx_RSU.toBigInteger().toString() + Ci.toString() + TS.toString();
                     BigInteger MAC = HMAC(macinput);
 
-                    //Query aggregation and reading 
+                    //Query aggregation and reading
                     if (MAC.equals(recievedMAC)) {
                         System.out.println("Packet received from Vi is Valid ");
                         sigmaCi=sigmaCi.add(Ci);
-                        String forpart3 = KVx_RSU.toBigInteger().toString() + "1" + TS.toString();                    
+                        String forpart3 = KVx_RSU.toBigInteger().toString() + "1" + TS.toString();
                         part3 = part3.add(H2(new BigInteger(forpart3)));
 
                     } else {
@@ -339,6 +410,35 @@ public class RSU implements Runnable, Serializable {
         for (int i = 0; i < dataIdentifiers.size(); i++) {
             System.out.println("m" + (i + 1) + " =" + dataIdentifiers.get(i));
         }
+        String content=getContent(dataIdentifiers);
+        System.out.println("content : "+content+"\nkd: "+Kd);
+
+//multicast content...
+flag = true;
+int port = 9008;
+//Broadcast Cooperation Request
+while (flag) {
+    try {
+        sleep(5000);
+        LocalDateTime datetime = LocalDateTime.now();
+        DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
+        String formattedDate = datetime.format(myFormatObj);
+        BigInteger TS = new BigInteger(formattedDate);
+        String ts=TS.toString();
+        String forLastKey = Kd.toString() + TS.toString();
+        BigInteger lastKey =new BigInteger(forLastKey);
+        BigInteger Cm=E(Kd,content);
+        System.out.println("Cm : "+Cm);
+        String macinput = Kd.toString() + Cm.toString() + TS.toString();
+        BigInteger MACm = HMAC(macinput);
+        System.out.println("mac : "+MACm);
+        ContentPacket con = new DataPacket7(Cm,TS,MACm);
+        multicast(con);
+        flag = false;
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
         System.out.println("RSU done");
         //System.out.println("sigmaCi in v:"+Vehicle.sigmaCi+"\nCa1 in v:"+Vehicle.Ca1+"\nMpart3 in v:"+Vehicle.Mpart3);
     }
