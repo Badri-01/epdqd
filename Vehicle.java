@@ -50,8 +50,10 @@ public class Vehicle implements Runnable, Serializable {
     BigInteger q = null;
     private boolean isVa;
     public int port; //For receiving and sending.
+    BigInteger DisseminationKey=null;
     private static boolean firstTS = true;
     private static String ts;
+    
     //static BigInteger sigmaCi = new BigInteger("0");
     //static BigInteger Ca1 = null;
     //static BigInteger Mpart3 = new BigInteger("0");
@@ -269,35 +271,34 @@ public class Vehicle implements Runnable, Serializable {
 
     public String getTimeStamp() {
         if (firstTS) {
-            firstTS=false;
+            firstTS = false;
             LocalDateTime datetime = LocalDateTime.now();
             //System.out.println("TimeStamp:" + datetime);
             DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("ddMMyyyyHHmmssnn");
             String formattedDate = datetime.format(myFormatObj);
             //System.out.println("After formatting: " + formattedDate);
             BigInteger TS = new BigInteger(formattedDate);
-            ts=TS.toString();
+            ts = TS.toString();
         }
         return ts;
     }
 
-    public static BigInteger E(BigInteger key, BigInteger clearText) throws Exception {
+    public static String E(String key, String clearText) throws Exception {
 
         Cipher rc4 = Cipher.getInstance("RC4");
-        SecretKeySpec rc4Key = new SecretKeySpec(key.toByteArray(), "RC4");
+        SecretKeySpec rc4Key = new SecretKeySpec(key.getBytes(), "RC4");
         rc4.init(Cipher.ENCRYPT_MODE, rc4Key);
-        byte[] cipherText = rc4.update(clearText.toByteArray());
-        return new BigInteger(cipherText);
-
+        byte[] cipherText = rc4.update(clearText.getBytes());
+        return new String(cipherText);
     }
 
-    public static BigInteger D(BigInteger key, BigInteger cipherText) throws Exception {
+    public static String D(String key, String cipherText) throws Exception {
 
-        SecretKeySpec rc4Key = new SecretKeySpec(key.toByteArray(), "RC4");
+        SecretKeySpec rc4Key = new SecretKeySpec(key.getBytes(), "RC4");
         Cipher rc4Decrypt = Cipher.getInstance("RC4");
         rc4Decrypt.init(Cipher.DECRYPT_MODE, rc4Key);
-        byte[] clearText = rc4Decrypt.update(cipherText.toByteArray());
-        return new BigInteger(clearText);
+        byte[] clearText = rc4Decrypt.update(cipherText.getBytes());
+        return new String(clearText);
 
     }
 
@@ -431,8 +432,8 @@ public class Vehicle implements Runnable, Serializable {
                         //System.out.println("After formatting: " + formattedDate);
                         BigInteger TS = new BigInteger(formattedDate);
                         BigInteger key = new BigInteger(KVa_Vi.toBigInteger().toString() + TS.toString());
-                        BigInteger cipherAlphai = E(key, Alphai);
-                        BigInteger cipherKd = E(key, Kd);
+                        BigInteger cipherAlphai = new BigInteger(E(key.toString(), Alphai.toString()));
+                        BigInteger cipherKd = new BigInteger(E(key.toString(), Kd.toString()));
                         String macinput = KVa_Vi.toBigInteger().toString() + cipherAlphai.toString() + cipherKd.toString() + TS.toString();
                         BigInteger MACai = HMAC(macinput);
                         DataPacket3 dp = new DataPacket3(cipherAlphai, cipherKd, TS, MACai);
@@ -513,6 +514,7 @@ public class Vehicle implements Runnable, Serializable {
             //First k-1 prime numbers are for Vi's. And last prime is for Va.
             Random rnd = new Random();
             BigInteger Kd = new BigInteger(128, rnd);
+            DisseminationKey = Kd;
             BigInteger Q = primelist.get(0);
             System.out.println(primelist);
             for (int i = 1; i < primelist.size(); i++) {
@@ -673,9 +675,10 @@ public class Vehicle implements Runnable, Serializable {
                         System.out.println("Received Packet is Invalid ");
                         break;
                     }
-                    Alphai = D(key, cipherAlphai);
-                    Kd = D(key, cipherKd);
+                    Alphai = new BigInteger(D(key.toString(), cipherAlphai.toString()));
+                    Kd = new BigInteger(D(key.toString(), cipherKd.toString()));
                     System.out.println("Alphai and Kd are received");
+                    DisseminationKey=Kd;
                     //System.out.println("Alphai received: " + Alphai + "\nKd received: " + Kd);
                     flag = false;
                     soc.close();
@@ -749,6 +752,43 @@ public class Vehicle implements Runnable, Serializable {
                     //flag=false;
                 }
             }
+        }
+
+        //Receving Data from RSU
+        MulticastSocket socket = null;
+        byte[] buf = new byte[10000];
+        try {
+            socket = new MulticastSocket(4446);
+            socket.setSoTimeout(20000);
+            InetAddress group = InetAddress.getByName("230.0.0.0");
+            socket.joinGroup(group);
+            //
+            DatagramPacket packet = new DatagramPacket(buf, buf.length);
+            socket.receive(packet);
+            byte[] data = packet.getData();
+            ByteArrayInputStream in = new ByteArrayInputStream(data);
+            ObjectInputStream is = new ObjectInputStream(in);
+            ContentPacket dp = null;
+            dp = (ContentPacket) is.readObject();
+            String Cm=dp.getCm();
+            BigInteger TS=dp.getTS();
+            BigInteger receivedMACm=dp.getMACm();
+            String macinput = DisseminationKey.toString() + Cm.toString() + TS.toString();
+            BigInteger MACm = HMAC(macinput);
+            if(receivedMACm.equals(MACm)){
+                 System.out.println("Received content is Valid ");
+                 String forKey = DisseminationKey.toString() + TS.toString();
+                 BigInteger Key = new BigInteger(forKey);
+                 String content = D(Key.toString(),Cm);
+                 System.out.println("Vehicle " + pub_id + " received \n"+ content);
+            }
+            else{
+                System.out.println("Received content is Invalid ");
+            }
+            
+
+        } catch (Exception e) {
+
         }
         System.out.println("Vehicle " + pub_id + " done");
     }
