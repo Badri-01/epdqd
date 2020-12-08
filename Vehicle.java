@@ -300,11 +300,11 @@ public class Vehicle implements Runnable, Serializable {
         return new BigInteger(clearText);
     }
 
-    public static String D(BigInteger key, String cipherText) throws Exception {
+    public static String D(BigInteger key, byte[] cipherText) throws Exception {
         SecretKeySpec rc4Key = new SecretKeySpec(key.toByteArray(), "RC4");
         Cipher rc4Decrypt = Cipher.getInstance("RC4");
         rc4Decrypt.init(Cipher.DECRYPT_MODE, rc4Key);
-        byte[] clearText = rc4Decrypt.update(cipherText.getBytes());
+        byte[] clearText = rc4Decrypt.update(cipherText);
         return new String(clearText);
     }
 
@@ -776,16 +776,16 @@ public class Vehicle implements Runnable, Serializable {
             ObjectInputStream is = new ObjectInputStream(in);
             ContentPacket dp = null;
             dp = (ContentPacket) is.readObject();
-            String Cm = dp.getCm();
+            byte[] Cm = dp.getCm();
             BigInteger TS = dp.getTS();
             BigInteger receivedMACm = dp.getMACm();
             //System.out.println("DisseminationKey :"+DisseminationKey);
-            String macinput = DisseminationKey.toString() + Cm + TS.toString();
+            String macinput = DisseminationKey.toString() + new String(Cm) + TS.toString();
             BigInteger MACm = HMAC(macinput);
             if (receivedMACm.equals(MACm)) {
                 System.out.println("Vehicle " + pub_id +"Received content is Valid ");
                 String Key = DisseminationKey.toString() + TS.toString();
-                System.out.println("Cm : " + Cm);
+                //System.out.println("Cm : " + Cm);
                 String content = D(new BigInteger(Key),Cm);
                 System.out.println("Content Received :\n"+content);
             } else {

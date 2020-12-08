@@ -20,6 +20,6 @@ public interface ContentPacket extends Serializable {
 
     BigInteger getMACm();
 
-    String getCm();
+    byte[] getCm();
 
 }

@@ -140,16 +140,16 @@ public class RSU implements Runnable, Serializable {
     static class DataPacket7 implements ContentPacket {
 
         BigInteger TS, MACm;
-        String Cm;
+        byte[] Cm;
 
-        public DataPacket7(String Cm, BigInteger TS, BigInteger MACm) {
+        public DataPacket7(byte[] Cm, BigInteger TS, BigInteger MACm) {
             this.Cm = Cm;
             this.TS = TS;
             this.MACm = MACm;
         }
 
         @Override
-        public String getCm() {
+        public byte[] getCm() {
             return Cm;
         }
 
@@ -196,14 +196,15 @@ public class RSU implements Runnable, Serializable {
         return h;
     }
 
-    public static String E(BigInteger key, String clearText) throws Exception {
+    public static byte[] E(BigInteger key, String clearText) throws Exception {
 
         Cipher rc4 = Cipher.getInstance("RC4");
         SecretKeySpec rc4Key = new SecretKeySpec(key.toByteArray(), "RC4");
         rc4.init(Cipher.ENCRYPT_MODE, rc4Key);
         byte[] cipherText = rc4.update(clearText.getBytes());
-        return new String(cipherText);
+        return cipherText;
     }
+    
 
     public BigInteger H2(BigInteger plainText) throws Exception {
         MessageDigest mdSha1 = MessageDigest.getInstance("MD5");
@@ -426,10 +427,8 @@ public class RSU implements Runnable, Serializable {
                 String formattedDate = datetime.format(myFormatObj);
                 BigInteger TS = new BigInteger(formattedDate);
                 String Key = Kd.toString() + TS.toString();
-                String Cm = E(new BigInteger(Key), content);
-                
-                System.out.println("Cm : " + Cm);
-                String macinput = Kd.toString() + Cm + TS.toString();
+                byte[] Cm = E(new BigInteger(Key), content);
+                String macinput = Kd.toString() + new String(Cm) + TS.toString();
                 BigInteger MACm = HMAC(macinput);
                 //System.out.println("mac : " + MACm);
                 ContentPacket con = new DataPacket7(Cm, TS, MACm);
