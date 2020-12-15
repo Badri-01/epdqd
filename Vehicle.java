@@ -443,7 +443,7 @@ public class Vehicle implements Runnable, Serializable {
                         String macinput = KVa_Vi.toBigInteger().toString() + cipherAlphai.toString() + cipherKd.toString() + TS.toString();
                         BigInteger MACai = HMAC(macinput);
                         DataPacket3 dp = new DataPacket3(cipherAlphai, cipherKd, TS, MACai);
-                        System.out.println("Alphai sent: " + Alphai + "\nKd sent: " + Kd);
+                        System.out.println("Alphai and Kd sent.");
                         out.writeObject(dp);
                         soc.close();
                         this.in.close();
@@ -522,11 +522,11 @@ public class Vehicle implements Runnable, Serializable {
             BigInteger Kd = new BigInteger(128, rnd);
             DisseminationKey = Kd;
             BigInteger Q = primelist.get(0);
-            System.out.println(primelist);
+            //System.out.println(primelist);
             for (int i = 1; i < primelist.size(); i++) {
                 Q = Q.multiply(primelist.get(i));
             }
-            System.out.println("Q=" + Q);
+            //System.out.println("Q=" + Q);
             for (int i = 0; i < threads.size(); i++) {
                 BigInteger qi = primelist.get(i);
                 BigInteger Qi = Q.divide(qi);
@@ -685,7 +685,7 @@ public class Vehicle implements Runnable, Serializable {
                     Kd = D(key, cipherKd);
                     System.out.println("Alphai and Kd are received");
                     DisseminationKey = Kd;
-                    System.out.println("Alphai received: " + Alphai + "\nKd received: " + Kd);
+                    //System.out.println("Alphai received: " + Alphai + "\nKd received: " + Kd);
                     flag = false;
                     soc.close();
                     out.close();

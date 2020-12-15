@@ -380,7 +380,7 @@ public class RSU implements Runnable, Serializable {
                 Thread t = new VehicleHandler(socket, in, out);
                 t.start();
             } catch (SocketTimeoutException e) {
-                System.out.println("RSU not getting any queries");//\ncount="+count+"queryDone="+queryDone+"Kd = "+Kd);
+                //System.out.println("RSU not getting any queries");//\ncount="+count+"queryDone="+queryDone+"Kd = "+Kd);
                 if (Kd != null && count == queryDone) {
                     break;
                 }

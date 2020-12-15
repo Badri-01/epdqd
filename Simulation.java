@@ -38,7 +38,7 @@ public class Simulation {
         V2.start();
         V3.start();*/
         ExecutorService executor = Executors.newFixedThreadPool(noOfThreads);
-        for (int i = 1; i <= 3; i++) {
+        for (int i = 1; i <= 50; i++) {
             Runnable V = new Vehicle(i, 9000);
             executor.execute(V);
         }
