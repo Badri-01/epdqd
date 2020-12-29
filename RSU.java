@@ -185,7 +185,7 @@ public class RSU implements Runnable, Serializable {
     public Element H(BigInteger plainText) {
         Element h = pairing.getG1().newElement();
         try {
-            MessageDigest mdSha1 = MessageDigest.getInstance("SHA-1");
+            MessageDigest mdSha1 = MessageDigest.getInstance("SHA3-256");
             byte[] pSha = mdSha1.digest(plainText.toByteArray());
             BigInteger no = new BigInteger(1, pSha);     //1 indicates positive number.
             byte[] ba = no.toByteArray();
